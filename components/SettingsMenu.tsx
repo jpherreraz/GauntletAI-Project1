@@ -5,6 +5,8 @@ import { X, User, LogOut, Paintbrush } from 'lucide-react'
 import { AccountSettings } from './AccountSettings'
 import { AppearanceSettings } from './AppearanceSettings'
 import { Card, CardContent } from "@/components/ui/card"
+import { useClerk } from '@clerk/nextjs'
+import { useRouter } from 'next/navigation'
 
 interface SettingsMenuProps {
   isOpen: boolean
@@ -14,8 +16,19 @@ interface SettingsMenuProps {
 
 export function SettingsMenu({ isOpen, onClose, user }: SettingsMenuProps) {
   const [activeTab, setActiveTab] = useState<'account' | 'appearance' | null>(null)
+  const { signOut } = useClerk()
+  const router = useRouter()
 
   if (!isOpen) return null
+
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+      router.push('/')
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center">
@@ -43,7 +56,11 @@ export function SettingsMenu({ isOpen, onClose, user }: SettingsMenuProps) {
                   <Paintbrush className="mr-2 h-4 w-4" />
                   Appearance
                 </Button>
-                <Button variant="ghost" className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-100" onClick={() => console.log("Log Out clicked")}>
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-100" 
+                  onClick={handleSignOut}
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   Log Out
                 </Button>

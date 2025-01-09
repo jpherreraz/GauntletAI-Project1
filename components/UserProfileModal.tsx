@@ -1,4 +1,6 @@
-import { useState } from 'react'
+'use client'
+
+import { useState, useEffect } from 'react'
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -6,6 +8,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -17,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { userService } from '@/src/services/userService'
 
 type Status = 'online' | 'idle' | 'dnd' | 'invisible'
 
@@ -46,16 +50,91 @@ interface UserProfileModalProps {
   onClose: () => void
   status: Status
   onStatusChange: (status: Status) => void
+  userId: string
+  username: string | undefined
+  imageUrl?: string
 }
 
-export function UserProfileModal({ isOpen, onClose, status, onStatusChange }: UserProfileModalProps) {
+export function UserProfileModal({ 
+  isOpen, 
+  onClose, 
+  status, 
+  onStatusChange,
+  userId,
+  username = 'Anonymous',
+  imageUrl
+}: UserProfileModalProps) {
   const [bio, setBio] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Load user profile when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      loadUserProfile();
+    }
+  }, [isOpen]);
+
+  const loadUserProfile = async () => {
+    try {
+      const profile = await userService.getUserProfile(userId);
+      if (profile) {
+        setBio(profile.bio || "");
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    }
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      // Validate required fields
+      if (!userId) {
+        console.error('Missing userId');
+        return;
+      }
+      
+      // Make sure we have a valid username, using fallbacks if needed
+      const validUsername = username.trim() || 'Anonymous';
+
+      const profileData = {
+        userId,
+        username: validUsername,
+        status: status as UserProfile['status'],
+        bio: bio || undefined,
+        imageUrl: imageUrl || undefined
+      };
+
+      console.log('Sending profile data:', profileData);
+
+      const success = await userService.updateUserProfile(profileData);
+      
+      if (success) {
+        onClose();
+      } else {
+        console.error('Failed to save profile');
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    console.log('UserProfileModal props:', {
+      userId,
+      username,
+      status,
+      imageUrl
+    });
+  }, [userId, username, status, imageUrl]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Edit Status</DialogTitle>
+          <DialogTitle>Edit Profile</DialogTitle>
           <DialogDescription>
             Update your status and bio here. Click save when you're done.
           </DialogDescription>
@@ -63,8 +142,8 @@ export function UserProfileModal({ isOpen, onClose, status, onStatusChange }: Us
         <div className="grid gap-4 py-4">
           <div className="flex items-center justify-center">
             <Avatar className="h-24 w-24">
-              <AvatarImage src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23808080'%3E%3Crect width='24' height='24' fill='%23d1d5db'/%3E%3Cpath d='M12 11.796C14.7189 11.796 16.9231 9.60308 16.9231 6.89801C16.9231 4.19294 14.7189 2 12 2C9.28106 2 7.07692 4.19294 7.07692 6.89801C7.07692 9.60308 9.28106 11.796 12 11.796Z' fill='%239ca3af'/%3E%3Cpath d='M12 13.9011C8.46154 13.9011 2 15.6678 2 19.1678V22H22V19.1678C22 15.6678 15.5385 13.9011 12 13.9011Z' fill='%239ca3af'/%3E%3C/svg%3E" alt="User Avatar" />
-              <AvatarFallback>U</AvatarFallback>
+              <AvatarImage src={imageUrl} alt={username} />
+              <AvatarFallback>{username[0]}</AvatarFallback>
             </Avatar>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -96,9 +175,15 @@ export function UserProfileModal({ isOpen, onClose, status, onStatusChange }: Us
               value={bio}
               onChange={(e) => setBio(e.target.value)}
               className="col-span-3"
+              placeholder="Tell us about yourself..."
             />
           </div>
         </div>
+        <DialogFooter>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? 'Saving...' : 'Save changes'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

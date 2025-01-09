@@ -198,16 +198,24 @@ export function Sidebar({
           </div>
         </ScrollArea>
         <div className="p-4 flex items-center gap-2">
-          <div className="relative">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={user?.imageUrl} />
-              <AvatarFallback>{user?.firstName?.[0] || user?.username?.[0]}</AvatarFallback>
-            </Avatar>
-            <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border border-background" />
-          </div>
-          <div className="flex-1 min-w-0 text-left">
-            <p className="text-sm font-medium truncate">{user?.fullName || user?.username}</p>
-            <p className="text-xs text-muted-foreground">Online</p>
+          <div 
+            className="flex-1 flex items-center gap-2 cursor-pointer hover:opacity-80"
+            onClick={() => setIsProfileModalOpen(true)}
+          >
+            <div className="relative">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={user?.imageUrl} />
+                <AvatarFallback>{user?.firstName?.[0] || user?.username?.[0]}</AvatarFallback>
+              </Avatar>
+              <div className={cn(
+                "absolute bottom-0 right-0 w-3 h-3 rounded-full border border-background",
+                statusColors[status]
+              )} />
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-sm font-medium truncate">{user?.fullName || user?.username}</p>
+              <p className="text-xs text-muted-foreground">{displayStatusText[status]}</p>
+            </div>
           </div>
           <Button
             variant="ghost"
@@ -232,6 +240,9 @@ export function Sidebar({
         onClose={() => setIsProfileModalOpen(false)}
         status={status}
         onStatusChange={handleStatusChange}
+        userId={user?.id || ''}
+        username={user?.username || ''}
+        imageUrl={user?.imageUrl}
       />
     </>
   )
