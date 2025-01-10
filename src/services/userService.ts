@@ -1,71 +1,72 @@
 export interface UserProfile {
   userId: string;
   username: string;
-  imageUrl?: string;
+  imageUrl: string;
   status: 'online' | 'idle' | 'dnd' | 'invisible';
-  bio?: string;
-  lastSeen?: number;
-  isDeleted?: boolean;
+  bio: string | null;
 }
 
 export const userService = {
   async getUserProfile(userId: string): Promise<UserProfile | null> {
     try {
+      console.log('Getting user profile for:', userId);
       const response = await fetch(`/api/user-profile?userId=${userId}`);
-      if (!response.ok) throw new Error('Failed to fetch profile');
-      return await response.json();
+      
+      if (!response.ok) {
+        console.error('Error response:', {
+          status: response.status,
+          statusText: response.statusText
+        });
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error data:', errorData);
+        return null;
+      }
+
+      const data = await response.json();
+      console.log('Got user profile:', data);
+      return data;
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('Error in getUserProfile:', {
+        error,
+        message: error instanceof Error ? error.message : String(error)
+      });
       return null;
     }
   },
 
-  async updateUserProfile(profile: Partial<UserProfile> & { userId: string }): Promise<boolean> {
+  async updateUserProfile(userId: string, updates: Partial<UserProfile>): Promise<UserProfile | null> {
     try {
-      // Debug log
-      console.log('Received profile data:', profile);
-
-      // Validate required fields
-      if (!profile.userId) {
-        console.error('Missing userId');
-        throw new Error('Missing required fields: userId');
-      }
-      if (!profile.username) {
-        console.error('Missing username');
-        throw new Error('Missing required fields: username');
-      }
-
-      // Construct the profile data with defaults
-      const profileData = {
-        userId: profile.userId,
-        username: profile.username,
-        status: profile.status || 'online',
-        bio: profile.bio || "Hey there! I'm using GauntletAI Chat.",
-        imageUrl: profile.imageUrl,
-        lastSeen: Date.now()
-      };
-
-      // Debug log
-      console.log('Sending profile data:', profileData);
-
+      console.log('Updating profile:', { userId, updates });
       const response = await fetch('/api/user-profile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(profileData),
+        body: JSON.stringify({
+          userId,
+          ...updates
+        }),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        console.error('API response error:', error);
-        throw new Error(error.message || 'Failed to update profile');
+        console.error('Error response:', {
+          status: response.status,
+          statusText: response.statusText
+        });
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error data:', errorData);
+        return null;
       }
 
-      return true;
+      const data = await response.json();
+      console.log('Updated profile:', data);
+      return data;
     } catch (error) {
-      console.error('Error updating user profile:', error);
-      throw error;
+      console.error('Error in updateUserProfile:', {
+        error,
+        message: error instanceof Error ? error.message : String(error)
+      });
+      return null;
     }
   }
 }; 

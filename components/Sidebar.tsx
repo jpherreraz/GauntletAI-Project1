@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Hash, User, MoreVertical, Settings, Cog } from 'lucide-react'
+import { Hash, User, MoreVertical, Settings, Cog, Globe, Bot, X } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +20,10 @@ import { Amplify } from 'aws-amplify';
 import { AppSyncClient, ListGraphqlApisCommand } from "@aws-sdk/client-appsync";
 import { DynamoDBClient, ListTablesCommand } from "@aws-sdk/client-dynamodb";
 import { useSettings } from "@/contexts/SettingsContext"
+import { UserProfile } from '@/src/services/userService'
+import { useRouter, usePathname } from 'next/navigation'
+import Link from 'next/link'
+import { toast } from "@/components/ui/use-toast";
 
 Amplify.configure({
   region: 'us-east-2', // e.g., 'us-east-1'
@@ -51,31 +55,58 @@ const displayStatusText: Record<Status, string> = {
   invisible: 'Offline'
 }
 
+type ViewMode = 'channels' | 'dms' | 'explore';
+
 interface SidebarProps {
   currentChannel: string
   onChannelChange: (channelName: string) => void
   username: string
+  viewMode: ViewMode
+  onServerClick: () => void
+  onBotClick: () => void
+  exploreView: ExploreView
+  dmUsers?: UserProfile[];
+  onStartDM?: (userId: string) => void;
+  selectedDMUserId?: string;
+  onDMListChange?: (dmUsers: UserProfile[]) => void;
 }
 
 export function Sidebar({ 
   currentChannel, 
   onChannelChange,
-  username
+  username,
+  viewMode,
+  onServerClick,
+  onBotClick,
+  exploreView,
+  dmUsers = [],
+  onStartDM,
+  selectedDMUserId,
+  onDMListChange,
 }: SidebarProps) {
   const { colorScheme } = useTheme()
+  const router = useRouter()
+  const pathname = usePathname()
   const { user } = useUser()
   const themeClasses = getThemeClasses(colorScheme)
   const [channels, setChannels] = useState<Channel[]>([
     { id: '1', name: 'general', type: 'channel' },
     { id: '2', name: 'random', type: 'channel' },
     { id: '3', name: 'support', type: 'channel' },
-    { id: '4', name: 'You', type: 'dm' },
   ])
   const [editingChannel, setEditingChannel] = useState<string | null>(null)
   const [status, setStatus] = useState<Status>('online')
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false)
   const { isOpen, setIsOpen } = useSettings();
+
+  // Add local state for DM users
+  const [localDmUsers, setLocalDmUsers] = useState(dmUsers);
+
+  // Update local state when props change
+  useEffect(() => {
+    setLocalDmUsers(dmUsers);
+  }, [dmUsers]);
 
   const handleStatusChange = useCallback((newStatus: Status) => {
     setStatus(newStatus);
@@ -124,6 +155,193 @@ export function Sidebar({
     }
   };
 
+  const handleBotClick = () => {
+    onBotClick();
+    router.push('/explore/bots');
+  };
+
+  const handleServerClick = () => {
+    onServerClick();
+    router.push('/explore/servers');
+  };
+
+  const isDMSelected = (userId: string) => {
+    return pathname?.includes(`/channels/me/${userId}`);
+  };
+
+  const handleDeleteDM = async (userId: string) => {
+    try {
+      // Update local state immediately
+      const updatedUsers = localDmUsers.filter(dmUser => dmUser.userId !== userId);
+      setLocalDmUsers(updatedUsers);
+      
+      // Update parent state immediately
+      onDMListChange?.(updatedUsers);
+
+      // Redirect if we're in the deleted DM's channel
+      if (pathname?.includes(`/channels/me/${userId}`)) {
+        router.push('/channels/me');
+      }
+
+      // Make the API call in the background
+      const response = await fetch(`/api/dm-list/remove?userId=${user?.id}&targetId=${userId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        // Revert both local and parent state if API call fails
+        setLocalDmUsers(dmUsers);
+        onDMListChange?.(dmUsers);
+        throw new Error('Failed to remove DM');
+      }
+      
+      toast({
+        description: "Direct message removed successfully",
+      });
+
+    } catch (error) {
+      console.error('Error removing DM:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove direct message",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const renderContent = () => {
+    switch (viewMode) {
+      case 'channels':
+        return (
+          <>
+            <div className="mb-6 flex items-center gap-3">
+              <div className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center",
+                `bg-${colorScheme}-600 bg-opacity-25`
+              )}>
+                <Globe className={cn(
+                  "h-4 w-4",
+                  `text-${colorScheme}-50`
+                )} />
+              </div>
+              <h2 className={cn(
+                "text-lg font-bold",
+                `text-${colorScheme}-50`
+              )}>
+                Global Chat
+              </h2>
+            </div>
+            <h3 className={cn(
+              "mb-2 px-2 text-sm font-semibold",
+              `text-${colorScheme}-50 text-opacity-70`
+            )}>
+              Channels
+            </h3>
+            {channels.map((channel) => (
+              <div key={channel.id} className="mb-1">
+                <div
+                  className={cn(
+                    "flex items-center w-full p-2 rounded-md cursor-pointer",
+                    channel.name === currentChannel
+                      ? cn(`bg-${colorScheme}-600`, "bg-opacity-30", `text-${colorScheme}-50`)
+                      : cn(`hover:bg-${colorScheme}-700`, "hover:bg-opacity-15", `text-${colorScheme}-50 text-opacity-90`)
+                  )}
+                  onClick={() => handleChannelClick(channel.name)}
+                >
+                  <Hash className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <span>{channel.name}</span>
+                </div>
+              </div>
+            ))}
+          </>
+        );
+      
+      case 'explore':
+        return (
+          <>
+            <h3 className={cn(
+              "mb-2 px-2 text-sm font-semibold",
+              `text-${colorScheme}-50 text-opacity-70`
+            )}>
+              Explore
+            </h3>
+            <div className="space-y-1">
+              <div
+                className={cn(
+                  "flex items-center w-full p-2 rounded-md cursor-pointer",
+                  exploreView === 'servers'
+                    ? cn(`bg-${colorScheme}-600`, "bg-opacity-30", `text-${colorScheme}-50`)
+                    : cn(`hover:bg-${colorScheme}-700`, "hover:bg-opacity-15", `text-${colorScheme}-50 text-opacity-90`)
+                )}
+                onClick={handleServerClick}
+              >
+                <Globe className="h-4 w-4 mr-2 flex-shrink-0" />
+                <span>Servers</span>
+              </div>
+              <div
+                className={cn(
+                  "flex items-center w-full p-2 rounded-md cursor-pointer",
+                  exploreView === 'bots'
+                    ? cn(`bg-${colorScheme}-600`, "bg-opacity-30", `text-${colorScheme}-50`)
+                    : cn(`hover:bg-${colorScheme}-700`, "hover:bg-opacity-15", `text-${colorScheme}-50 text-opacity-90`)
+                )}
+                onClick={handleBotClick}
+              >
+                <Bot className="h-4 w-4 mr-2 flex-shrink-0" />
+                <span>Bots</span>
+              </div>
+            </div>
+          </>
+        );
+      
+      case 'dms':
+        return (
+          <>
+            <h3 className={cn(
+              "mb-2 px-2 text-sm font-semibold",
+              `text-${colorScheme}-50 text-opacity-70`
+            )}>
+              Direct Messages
+            </h3>
+            <div className="space-y-1">
+              {localDmUsers.map((dmUser) => (
+                <div
+                  key={dmUser.userId}
+                  className="group relative flex items-center px-2 py-1.5 rounded-md hover:bg-accent/50"
+                >
+                  <Link
+                    href={`/channels/me/${dmUser.userId}`}
+                    className={cn(
+                      "flex items-center gap-2 flex-1 min-w-0",
+                      pathname === `/channels/me/${dmUser.userId}` && "bg-accent"
+                    )}
+                  >
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={dmUser.imageUrl} />
+                      <AvatarFallback>{dmUser.fullName?.[0] || dmUser.username[0]}</AvatarFallback>
+                    </Avatar>
+                    <span className="truncate">{dmUser.fullName || dmUser.username}</span>
+                  </Link>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDeleteDM(dmUser.userId);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 h-6 w-6 p-0 ml-2 hover:bg-red-500/20 hover:text-red-400"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </>
+        );
+    }
+  };
+
   return (
     <>
       <div className={cn(
@@ -133,68 +351,7 @@ export function Sidebar({
       )}>
         <ScrollArea className="flex-grow">
           <div className="p-4">
-            <h3 className={cn(
-              "mb-2 px-2 text-sm font-semibold",
-              `text-${colorScheme}-50 text-opacity-70`
-            )}>
-              Channels
-            </h3>
-            {channels.filter(channel => channel.type === 'channel').map((channel) => (
-              <div key={channel.id} className="mb-1">
-                <div
-                  className={cn(
-                    "flex items-center w-full p-2 rounded-md cursor-pointer",
-                    channel.name === currentChannel
-                      ? cn(
-                          `bg-${colorScheme}-600`,
-                          "bg-opacity-30",
-                          `text-${colorScheme}-50`
-                        )
-                      : cn(
-                          `hover:bg-${colorScheme}-700`,
-                          "hover:bg-opacity-15",
-                          `text-${colorScheme}-50 text-opacity-90`
-                        )
-                  )}
-                  onClick={() => handleChannelClick(channel.name)}
-                >
-                  {renderChannelIcon(channel)}
-                  <span>{channel.name}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="p-2 mt-4">
-            <h3 className={cn(
-              "mt-6 mb-2 px-2 text-sm font-semibold",
-              `text-${colorScheme}-50 text-opacity-70`
-            )}>
-              Direct Messages
-            </h3>
-            {channels.filter(channel => channel.type === 'dm').map((channel) => (
-              <div key={channel.id} className="mb-1">
-                <div
-                  className={cn(
-                    "flex items-center w-full p-2 rounded-md cursor-pointer",
-                    channel.name === currentChannel
-                      ? cn(
-                          `bg-${colorScheme}-600`,
-                          "bg-opacity-30",
-                          `text-${colorScheme}-50`
-                        )
-                      : cn(
-                          `hover:bg-${colorScheme}-700`,
-                          "hover:bg-opacity-15",
-                          `text-${colorScheme}-50 text-opacity-90`
-                        )
-                  )}
-                  onClick={() => handleChannelClick(channel.name)}
-                >
-                  {renderChannelIcon(channel)}
-                  <span>{channel.name === username ? 'You' : channel.name}</span>
-                </div>
-              </div>
-            ))}
+            {renderContent()}
           </div>
         </ScrollArea>
         <div className="p-4 flex items-center gap-2">

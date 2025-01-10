@@ -18,6 +18,7 @@ import {
 import { useClerk, useUser } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import { messageService } from "@/src/services/messageService"
+import { toast } from "@/components/ui/use-toast"
 
 interface UserInfo {
   displayName: string
@@ -42,42 +43,30 @@ export function AccountSettings({ user: clerkUser }: AccountSettingsProps) {
     setIsDeleting(true);
     
     try {
-      // First, reassign all messages to deleted user
-      await messageService.reassignMessagesToDeletedUser(user.id);
-
-      // Then delete the user profile
-      const deleteProfileResponse = await fetch('/api/user-profile', {
+      // Delete user profile (which will handle message reassignment and Clerk deletion)
+      const response = await fetch(`/api/user-profile?userId=${user.id}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId: user.id }),
       });
 
-      if (!deleteProfileResponse.ok) {
-        throw new Error('Failed to delete user profile');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete user profile');
       }
 
-      // Delete the Clerk account through our API route
-      const deleteUserResponse = await fetch('/api/delete-user', {
-        method: 'DELETE'
-      });
-
-      if (!deleteUserResponse.ok) {
-        throw new Error('Failed to delete Clerk account');
-      }
-
-      // Sign out after successful deletion
+      // Sign out and redirect
       await signOut({
-        sessionId: user.primarySessionId || undefined,
         redirectUrl: '/'
       });
       
     } catch (error) {
       console.error('Error deleting account:', error);
       setIsDeleting(false);
-      // Show error to user
-      alert('Failed to delete account. Please try again.');
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete account. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 

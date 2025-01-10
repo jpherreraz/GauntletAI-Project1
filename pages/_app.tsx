@@ -4,7 +4,14 @@ import '@/styles/globals.css'
 
 function MyApp({ Component, pageProps }: AppProps) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      dynamic
+        cookieOptions={{
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production',
+          maxAge: 60 * 60 * 24
+        }}
+    >
       <Component {...pageProps} />
     </ClerkProvider>
   )

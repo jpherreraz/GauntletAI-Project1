@@ -13,25 +13,17 @@ export default function LandingPage() {
 
   const handleStartChatting = () => {
     if (isSignedIn) {
-      router.push('/chat');
+      router.push('/channels/me');
     } else {
-      setShowSignIn(true);
+      router.push('/sign-in');
     }
   };
 
-  if (showSignIn) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <SignIn afterSignInUrl="/chat" />
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
-      <h1 className="text-4xl font-bold mb-4">Welcome to GauntletAI Chat</h1>
-      <p className="text-xl mb-8 text-muted-foreground max-w-lg">
-        Experience the future of AI-powered conversations. Connect, share, and explore with our intelligent chat platform.
+      <h1 className="text-4xl font-bold mb-4">Welcome to ChatGenius</h1>
+      <p className="text-xl text-muted-foreground mb-8">
+        Connect with others through channels and direct messages
       </p>
       <Button 
         size="lg" 

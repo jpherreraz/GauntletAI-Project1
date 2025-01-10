@@ -209,62 +209,57 @@ export const messageService: MessageService = {
     }
   },
 
-  async reassignMessagesToDeletedUser(userId: string): Promise<boolean> {
+  async reassignMessagesToDeletedUser(userId: string) {
     try {
-      // Get all messages from this user
-      const params = {
-        TableName: 'Messages',
-        FilterExpression: 'userId = :userId',
+      console.log('Reassigning messages for user:', userId);
+      
+      // First, get all messages from this user
+      const queryCommand = new QueryCommand({
+        TableName: process.env.DYNAMODB_TABLE_MESSAGES,
+        IndexName: 'userId-index',
+        KeyConditionExpression: 'userId = :userId',
         ExpressionAttributeValues: marshall({
           ':userId': userId
         })
-      };
+      });
 
-      const { Items = [] } = await dynamoClient.send(new ScanCommand(params));
-      
-      // Get message IDs for filtering replies later
-      const messageIds = Items.map(item => unmarshall(item).id);
-      
-      // Update each message to use the deleted user ID
-      for (const item of Items) {
-        const message = unmarshall(item);
-        const updateParams = {
-          TableName: 'Messages',
+      const client = new DynamoDBClient({
+        region: 'us-east-2',
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!
+        }
+      });
+
+      const { Items = [] } = await client.send(queryCommand);
+      const messages = Items.map(item => unmarshall(item));
+
+      console.log(`Found ${messages.length} messages to reassign`);
+
+      // Update each message to the deleted user
+      for (const message of messages) {
+        const updateCommand = new UpdateItemCommand({
+          TableName: process.env.DYNAMODB_TABLE_MESSAGES,
           Key: marshall({
             channelId: message.channelId,
             timestamp: message.timestamp
           }),
-          UpdateExpression: 'SET userId = :deletedId, username = :deletedName',
+          UpdateExpression: 'SET userId = :newUserId, username = :newUsername',
           ExpressionAttributeValues: marshall({
-            ':deletedId': DELETED_USER_ID,
-            ':deletedName': 'Deleted User'
-          }),
-          ReturnValues: 'ALL_NEW' as const
-        };
-
-        await dynamoClient.send(new UpdateItemCommand(updateParams));
-      }
-
-      // Find replies using multiple scans if needed
-      for (const messageId of messageIds) {
-        const replyParams = {
-          TableName: 'Messages',
-          FilterExpression: 'replyToId = :messageId',
-          ExpressionAttributeValues: marshall({
-            ':messageId': messageId
+            ':newUserId': DELETED_USER_ID,
+            ':newUsername': 'Deleted User'
           })
-        };
+        });
 
-        const { Items: ReplyItems = [] } = await dynamoClient.send(new ScanCommand(replyParams));
-        
-        // No need to update replies, just keeping them for reference
-        console.log(`Found ${ReplyItems.length} replies to message ${messageId}`);
+        await client.send(updateCommand);
       }
 
+      console.log('Successfully reassigned all messages');
       return true;
+
     } catch (error) {
       console.error('Error reassigning messages:', error);
-      return false;
+      throw error;
     }
   }
 }; 
