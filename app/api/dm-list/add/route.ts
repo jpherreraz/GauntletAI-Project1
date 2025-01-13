@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { DynamoDBClient, GetItemCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
-import { auth } from "@clerk/nextjs";
-import { clerkClient } from "@clerk/nextjs";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { UserProfile } from "@/src/services/userService";
 
 const dynamoDb = new DynamoDBClient({
