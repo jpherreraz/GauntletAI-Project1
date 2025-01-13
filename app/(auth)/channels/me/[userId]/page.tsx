@@ -1,13 +1,11 @@
 import { DirectMessageBox } from '@/components/DirectMessageBox';
-import { MessageBox } from '@/components/MessageBox';
 
-interface Props {
-  params: {
-    userId: string;
-  }
+export interface PageProps {
+  params: { userId: string };
+  searchParams: { [key: string]: string | string[] | undefined };
 }
 
-export default function UserDMPage({ params }: Props) {
+export default function UserDMPage({ params }: PageProps) {
   return (
     <div className="flex flex-col flex-1">
       <DirectMessageBox recipientId={params.userId} />
