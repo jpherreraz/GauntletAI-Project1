@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { DynamoDBClient, GetItemCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
+import { clerkClient } from "@clerk/nextjs/server";
 import { UserProfile } from "@/src/services/userService";
 
 const dynamoDb = new DynamoDBClient({
@@ -25,7 +26,8 @@ export async function POST(request: Request) {
     const { recipientId } = body;
 
     // Get current user's info
-    const currentUser = await clerkClient.users.getUser(userId);
+    const clerk = await clerkClient();
+    const currentUser = await clerk.users.getUser(userId);
     const currentUserInfo: UserProfile = {
       userId: currentUser.id,
       username: currentUser.firstName || 'User',
@@ -35,7 +37,7 @@ export async function POST(request: Request) {
     };
 
     // Get recipient's info
-    const recipientUser = await clerkClient.users.getUser(recipientId);
+    const recipientUser = await clerk.users.getUser(recipientId);
     const recipientInfo: UserProfile = {
       userId: recipientUser.id,
       username: recipientUser.firstName || 'User',

@@ -21,30 +21,14 @@ async function recreateTable() {
 
     // Create new table with MessageIdIndex
     const params = {
-      TableName: 'Messages',
+      TableName: MESSAGES_TABLE,
       KeySchema: [
-        { AttributeName: 'channelId', KeyType: 'HASH' },
-        { AttributeName: 'timestamp', KeyType: 'RANGE' }
+        { AttributeName: "channelId", KeyType: "HASH" },  // Partition key
+        { AttributeName: "id", KeyType: "RANGE" }         // Sort key
       ],
       AttributeDefinitions: [
-        { AttributeName: 'channelId', AttributeType: 'S' },
-        { AttributeName: 'timestamp', AttributeType: 'N' },
-        { AttributeName: 'id', AttributeType: 'S' }
-      ],
-      GlobalSecondaryIndexes: [
-        {
-          IndexName: 'MessageIdIndex',
-          KeySchema: [
-            { AttributeName: 'id', KeyType: 'HASH' }
-          ],
-          Projection: {
-            ProjectionType: 'ALL'
-          },
-          ProvisionedThroughput: {
-            ReadCapacityUnits: 5,
-            WriteCapacityUnits: 5
-          }
-        }
+        { AttributeName: "channelId", AttributeType: "S" },
+        { AttributeName: "id", AttributeType: "S" }
       ],
       ProvisionedThroughput: {
         ReadCapacityUnits: 5,

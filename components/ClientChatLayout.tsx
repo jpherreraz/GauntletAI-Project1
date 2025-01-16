@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from 'next/navigation'
 import { UserProfile } from '@/src/services/userService'
 import { dmListService } from '@/src/services/dmListService'
+import { ChatMessages } from '@/components/chat/ChatMessages'
 
 type ExploreView = 'none' | 'servers' | 'bots';
 type ViewMode = 'channels' | 'dms' | 'explore';
@@ -176,7 +177,7 @@ export function ClientChatLayout({
       <Sidebar 
         currentChannel={currentChannel}
         onChannelChange={handleChannelChange}
-        username={user?.fullName || user?.username || 'Anonymous'}
+        username={user?.firstName || 'Anonymous'}
         viewMode={viewMode}
         onServerClick={() => setExploreView('servers')}
         onBotClick={() => setExploreView('bots')}
@@ -184,18 +185,9 @@ export function ClientChatLayout({
         dmUsers={dmUsers}
         onStartDM={handleStartDM}
         selectedDMUserId={selectedDMUserId || ''}
+        onDMListChange={setDmUsers}
       />
       <main className="flex-1 flex flex-col min-w-0">
-        <div className={cn(
-          "h-12 border-b flex items-center px-4 font-medium",
-          `bg-${colorScheme}-950 border-${colorScheme}-800`
-        )}>
-          {exploreView === 'none' && (
-            viewMode === 'channels' ? 
-              `# ${currentChannel}` : 
-              selectedDMUser?.fullName
-          )}
-        </div>
         {getMainContent()}
       </main>
     </div>

@@ -9,9 +9,5 @@ export default function ChannelPage() {
   
   const channelId = params.channelId as string
 
-  return (
-    <div className="flex-1">
-      <MessageBox channel={channelId} />
-    </div>
-  )
+  return <MessageBox channel={channelId} />
 } 

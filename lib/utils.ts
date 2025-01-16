@@ -5,29 +5,31 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatDate(timestamp: number): string {
-  return new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  }).format(new Date(timestamp));
+export function formatDate(timestamp: number) {
+  const date = new Date(timestamp);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) {
+    return 'Today';
+  } else if (date.toDateString() === yesterday.toDateString()) {
+    return 'Yesterday';
+  } else {
+    return date.toLocaleDateString();
+  }
 }
 
-export function formatMessageTime(timestamp: number): string {
-  return new Intl.DateTimeFormat('en-US', {
+export function formatMessageTime(timestamp: number) {
+  return new Date(timestamp).toLocaleString('en-US', {
     hour: 'numeric',
     minute: 'numeric',
     hour12: true
-  }).format(new Date(timestamp));
+  });
 }
 
-export function isSameDay(date1: number, date2: number): boolean {
-  const d1 = new Date(date1);
-  const d2 = new Date(date2);
-  return (
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate()
-  );
+export function isSameDay(timestamp1: number, timestamp2: number) {
+  const date1 = new Date(timestamp1);
+  const date2 = new Date(timestamp2);
+  return date1.toDateString() === date2.toDateString();
 }

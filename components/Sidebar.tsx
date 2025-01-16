@@ -1,37 +1,18 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Hash, User, MoreVertical, Settings, Cog, Globe, Bot, X } from 'lucide-react'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { Hash, User, Bot, Globe, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from "@/lib/utils"
-import { UserProfileModal } from './UserProfileModal'
-import { SettingsMenu } from './SettingsMenu'
 import { useTheme } from '@/contexts/ThemeContext'
-import { getThemeClasses } from '@/lib/theme'
 import { useUser } from '@clerk/nextjs'
-import { Amplify } from 'aws-amplify';
-import { AppSyncClient, ListGraphqlApisCommand } from "@aws-sdk/client-appsync";
-import { DynamoDBClient, ListTablesCommand } from "@aws-sdk/client-dynamodb";
-import { useSettings } from "@/contexts/SettingsContext"
 import { UserProfile } from '@/src/services/userService'
 import { useRouter, usePathname } from 'next/navigation'
+import { toast } from "@/components/ui/use-toast"
+import { useSettings } from "@/contexts/SettingsContext"
 import Link from 'next/link'
-import { toast } from "@/components/ui/use-toast";
-
-Amplify.configure({
-  region: 'us-east-2', // e.g., 'us-east-1'
-  credentials: {
-    accessKeyId: 'AKIAW5BDQ6ZZ3EIKJYUI',
-    secretAccessKey: 'c2bOGkLE9ezXvtKxJmwxjxGqbXzODqrrCchY5954',
-  }
-});
+import { UserProfileModal } from './UserProfileModal'
 
 interface Channel {
   id: string
@@ -40,6 +21,22 @@ interface Channel {
 }
 
 type Status = 'online' | 'idle' | 'dnd' | 'invisible'
+type ViewMode = 'channels' | 'dms' | 'explore'
+type ExploreView = 'none' | 'servers' | 'bots'
+
+interface SidebarProps {
+  currentChannel: string
+  onChannelChange: (channelName: string) => void
+  username: string
+  viewMode: ViewMode
+  onServerClick: () => void
+  onBotClick: () => void
+  exploreView: ExploreView
+  dmUsers?: UserProfile[]
+  onStartDM?: (userId: string) => void
+  selectedDMUserId?: string
+  onDMListChange?: (dmUsers: UserProfile[]) => void
+}
 
 const statusColors: Record<Status, string> = {
   online: 'bg-green-500',
@@ -53,22 +50,6 @@ const displayStatusText: Record<Status, string> = {
   idle: 'Idle',
   dnd: 'Do Not Disturb',
   invisible: 'Offline'
-}
-
-type ViewMode = 'channels' | 'dms' | 'explore';
-
-interface SidebarProps {
-  currentChannel: string
-  onChannelChange: (channelName: string) => void
-  username: string
-  viewMode: ViewMode
-  onServerClick: () => void
-  onBotClick: () => void
-  exploreView: ExploreView
-  dmUsers?: UserProfile[];
-  onStartDM?: (userId: string) => void;
-  selectedDMUserId?: string;
-  onDMListChange?: (dmUsers: UserProfile[]) => void;
 }
 
 export function Sidebar({ 
@@ -88,126 +69,83 @@ export function Sidebar({
   const router = useRouter()
   const pathname = usePathname()
   const { user } = useUser()
-  const themeClasses = getThemeClasses(colorScheme)
-  const [channels, setChannels] = useState<Channel[]>([
+  const { isOpen, setIsOpen } = useSettings()
+  const [channels] = useState<Channel[]>([
     { id: '1', name: 'general', type: 'channel' },
     { id: '2', name: 'random', type: 'channel' },
     { id: '3', name: 'support', type: 'channel' },
   ])
-  const [editingChannel, setEditingChannel] = useState<string | null>(null)
   const [status, setStatus] = useState<Status>('online')
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
-  const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false)
-  const { isOpen, setIsOpen } = useSettings();
+  const [localDmUsers, setLocalDmUsers] = useState(dmUsers)
 
-  // Add local state for DM users
-  const [localDmUsers, setLocalDmUsers] = useState(dmUsers);
-
-  // Update local state when props change
   useEffect(() => {
-    setLocalDmUsers(dmUsers);
-  }, [dmUsers]);
+    setLocalDmUsers(dmUsers)
+  }, [dmUsers])
 
-  const handleStatusChange = useCallback((newStatus: Status) => {
-    setStatus(newStatus);
-  }, []);
-
-  const handleOpenSettings = () => {
-    setIsSettingsMenuOpen(true);
-  };
-
-  const handleDeleteChannel = (id: string) => {
-    setChannels(channels.filter(channel => channel.id !== id))
-    if (currentChannel === channels.find(c => c.id === id)?.name) {
-      onChannelChange('general')
-    }
-  }
-
-  const handleEditChannel = (id: string, newName: string) => {
-    setChannels(channels.map(channel =>
-      channel.id === id ? { ...channel, name: newName } : channel
-    ))
-    setEditingChannel(null)
-    if (currentChannel === channels.find(c => c.id === id)?.name) {
-      onChannelChange(newName)
-    }
-  }
-
-  const renderChannelIcon = (channel: Channel) => {
-    if (channel.type === 'channel') {
-      return <Hash className="h-4 w-4 mr-2 flex-shrink-0" />
-    }
-    return <User className="h-4 w-4 mr-2 flex-shrink-0" />
-  }
-
-  // const testAccess = async () => {
-  //   try {
-  //     const appSyncClient = new AppSyncClient(...);
-  //     ...
-  //   } catch (error) {
-  //     ...
-  //   }
-  // };
+  const handleStatusChange = useCallback((newStatus: string) => {
+    setStatus(newStatus as Status)
+  }, [])
 
   const handleChannelClick = (channelName: string) => {
     if (typeof onChannelChange === 'function') {
-      onChannelChange(channelName);
+      onChannelChange(channelName)
     }
-  };
+  }
 
   const handleBotClick = () => {
-    onBotClick();
-    router.push('/explore/bots');
-  };
+    onBotClick()
+    router.push('/explore/bots')
+  }
 
   const handleServerClick = () => {
-    onServerClick();
-    router.push('/explore/servers');
-  };
+    onServerClick()
+    router.push('/explore/servers')
+  }
 
   const isDMSelected = (userId: string) => {
-    return pathname?.includes(`/channels/me/${userId}`);
-  };
+    return pathname?.includes(`/channels/me/${userId}`)
+  }
 
   const handleDeleteDM = async (userId: string) => {
     try {
       // Update local state immediately
-      const updatedUsers = localDmUsers.filter(dmUser => dmUser.userId !== userId);
-      setLocalDmUsers(updatedUsers);
+      const updatedUsers = localDmUsers.filter(dmUser => dmUser.userId !== userId)
+      setLocalDmUsers(updatedUsers)
       
       // Update parent state immediately
-      onDMListChange?.(updatedUsers);
+      onDMListChange?.(updatedUsers)
 
       // Redirect if we're in the deleted DM's channel
       if (pathname?.includes(`/channels/me/${userId}`)) {
-        router.push('/channels/me');
+        router.push('/channels/me')
       }
 
       // Make the API call in the background
       const response = await fetch(`/api/dm-list/remove?userId=${user?.id}&targetId=${userId}`, {
         method: 'DELETE'
-      });
+      })
 
       if (!response.ok) {
         // Revert both local and parent state if API call fails
-        setLocalDmUsers(dmUsers);
-        onDMListChange?.(dmUsers);
-        throw new Error('Failed to remove DM');
+        setLocalDmUsers(dmUsers)
+        onDMListChange?.(dmUsers)
+        throw new Error('Failed to remove DM')
       }
       
       toast({
         description: "Direct message removed successfully",
-      });
+      })
 
     } catch (error) {
-      console.error('Error removing DM:', error);
+      console.error('Error removing DM:', error)
       toast({
         title: "Error",
         description: "Failed to remove direct message",
         variant: "destructive"
-      });
+      })
     }
-  };
+  }
 
   const renderContent = () => {
     switch (viewMode) {
@@ -254,8 +192,8 @@ export function Sidebar({
               </div>
             ))}
           </>
-        );
-      
+        )
+
       case 'explore':
         return (
           <>
@@ -292,8 +230,8 @@ export function Sidebar({
               </div>
             </div>
           </>
-        );
-      
+        )
+
       case 'dms':
         return (
           <>
@@ -318,7 +256,7 @@ export function Sidebar({
                   >
                     <Avatar className="h-8 w-8">
                       <AvatarImage src={dmUser.imageUrl} />
-                      <AvatarFallback>{dmUser.fullName?.[0] || dmUser.username[0]}</AvatarFallback>
+                      <AvatarFallback>{dmUser.fullName?.[0] || dmUser.username?.[0]}</AvatarFallback>
                     </Avatar>
                     <span className="truncate">{dmUser.fullName || dmUser.username}</span>
                   </Link>
@@ -326,9 +264,9 @@ export function Sidebar({
                     variant="ghost"
                     size="sm"
                     onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleDeleteDM(dmUser.userId);
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleDeleteDM(dmUser.userId)
                     }}
                     className="opacity-0 group-hover:opacity-100 h-6 w-6 p-0 ml-2 hover:bg-red-500/20 hover:text-red-400"
                   >
@@ -338,9 +276,9 @@ export function Sidebar({
               ))}
             </div>
           </>
-        );
+        )
     }
-  };
+  }
 
   return (
     <>
@@ -398,7 +336,6 @@ export function Sidebar({
         status={status}
         onStatusChange={handleStatusChange}
         userId={user?.id || ''}
-        username={user?.username || ''}
         imageUrl={user?.imageUrl}
       />
     </>

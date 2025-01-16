@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { DynamoDBClient, GetItemCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
 import { getAuth } from "@clerk/nextjs/server";
@@ -13,7 +13,7 @@ const dynamoDb = new DynamoDBClient({
 
 const TABLE_NAME = process.env.DYNAMODB_TABLE_DM_LISTS || "user-dm-lists";
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     // Get auth and params
     const { userId } = await getAuth(request);
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const { userId } = await getAuth(request);
     if (!userId) {

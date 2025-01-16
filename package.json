@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "create-dm-table": "ts-node scripts/createDMListTable.ts",
-    "clear-messages": "ts-node scripts/clearMessages.ts"
+    "create-messages-table": "ts-node src/utils/setup-dynamodb.ts",
+    "clear-messages": "ts-node scripts/clearMessages.ts",
+    "test-aws": "ts-node scripts/test-aws-connection.ts"
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.8.1",
@@ -17,6 +19,7 @@
     "@aws-sdk/client-s3": "^3.726.0",
     "@aws-sdk/s3-request-presigner": "^3.726.0",
     "@aws-sdk/util-dynamodb": "^3.724.0",
+    "@clerk/clerk-sdk-node": "^5.1.6",
     "@clerk/nextjs": "^6.9.9",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "^1.2.2",
@@ -46,6 +49,7 @@
     "@radix-ui/react-toggle": "^1.1.1",
     "@radix-ui/react-toggle-group": "^1.1.1",
     "@radix-ui/react-tooltip": "^1.1.6",
+    "@tanstack/react-virtual": "^3.11.2",
     "autoprefixer": "^10.4.20",
     "aws-amplify": "^6.12.0",
     "class-variance-authority": "^0.7.1",

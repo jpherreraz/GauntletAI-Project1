@@ -1,7 +1,6 @@
 {
-  "/api/dm-list/route": "app/api/dm-list/route.js",
-  "/api/user-profile/route": "app/api/user-profile/route.js",
-  "/(auth)/channels/global/[channelId]/page": "app/(auth)/channels/global/[channelId]/page.js",
   "/(auth)/channels/me/page": "app/(auth)/channels/me/page.js",
-  "/(auth)/explore/[view]/page": "app/(auth)/explore/[view]/page.js"
+  "/(auth)/channels/global/[channelId]/page": "app/(auth)/channels/global/[channelId]/page.js",
+  "/(auth)/explore/[view]/page": "app/(auth)/explore/[view]/page.js",
+  "/(public)/sign-in/[[...sign-in]]/page": "app/(public)/sign-in/[[...sign-in]]/page.js"
 }
