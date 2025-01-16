@@ -41,6 +41,16 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/dm-list/route.js"
     ],
+    "/api/messages/reaction/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/messages/reaction/route.js"
+    ],
+    "/api/messages/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/messages/route.js"
+    ],
     "/(auth)/channels/me/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -51,10 +61,20 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(auth)/explore/[view]/page.js"
     ],
-    "/api/user-profile/route": [
+    "/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/user-profile/route.js"
+      "static/chunks/app/page.js"
+    ],
+    "/(public)/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(public)/layout.js"
+    ],
+    "/(public)/sign-in/[[...sign-in]]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(public)/sign-in/[[...sign-in]]/page.js"
     ]
   }
 }

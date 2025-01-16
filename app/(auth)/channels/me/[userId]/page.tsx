@@ -1,14 +1,23 @@
+import { Metadata } from 'next';
 import { DirectMessageBox } from '@/components/DirectMessageBox';
 
-interface PageProps {
-  params: { userId: string };
-  searchParams?: { [key: string]: string | string[] | undefined };
-}
+export const metadata: Metadata = {
+  title: 'Direct Message',
+  description: 'Chat directly with another user'
+};
 
-export default async function UserDMPage({ params }: PageProps) {
+type DMParams = Promise<{ userId: string }>;
+
+export default async function DMPage({
+  params,
+}: {
+  params: DMParams
+}) {
+  const { userId } = await params;
+
   return (
-    <div className="flex flex-col flex-1">
-      <DirectMessageBox recipientId={params.userId} />
+    <div>
+      <DirectMessageBox recipientId={userId} />
     </div>
   );
 } 

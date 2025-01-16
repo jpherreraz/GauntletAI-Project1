@@ -1,9 +1,9 @@
 'use client'
 
-import { MessageSquare, Compass, Plus, Globe } from 'lucide-react'
 import { cn } from "@/lib/utils"
-import { useTheme } from '@/contexts/ThemeContext'
-import { Button } from './ui/button'
+import { Button } from "@/components/ui/button"
+import { MessageSquare, Compass, Plus, Globe } from 'lucide-react'
+import { useTheme } from "@/contexts/ThemeContext"
 import {
   Tooltip,
   TooltipContent,
@@ -11,9 +11,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
+type ViewMode = 'channels' | 'dms' | 'explore'
+
 interface NavigationSidebarProps {
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
+  viewMode: ViewMode
+  onViewModeChange: (mode: ViewMode) => void
 }
 
 export function NavigationSidebar({ viewMode, onViewModeChange }: NavigationSidebarProps) {

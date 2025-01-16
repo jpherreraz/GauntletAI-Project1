@@ -1,9 +1,16 @@
-import { SignInButton, SignOutButton, UserButton } from "@clerk/nextjs";
+import { SignInButton, SignOutButton } from "@clerk/nextjs";
+import { Button } from "@/components/ui/button";
 
-// For signed-out users
-<SignInButton>
-  <Button>Sign In</Button>
-</SignInButton>
+export function Navigation() {
+  return (
+    <div className="flex gap-4">
+      <SignInButton>
+        <Button>Sign In</Button>
+      </SignInButton>
 
-// For signed-in users
-<UserButton afterSignOutUrl="/" /> 
+      <SignOutButton>
+        <Button variant="outline">Sign Out</Button>
+      </SignOutButton>
+    </div>
+  );
+} 

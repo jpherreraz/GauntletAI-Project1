@@ -1,23 +1,31 @@
-import { clerkClient } from "@clerk/nextjs";
+import { createClerkClient } from "@clerk/clerk-sdk-node";
 import { NextApiRequest, NextApiResponse } from "next";
 
+if (!process.env.CLERK_SECRET_KEY) {
+  throw new Error('Missing CLERK_SECRET_KEY environment variable');
+}
+
+const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { userId } = req.query;
-
-  if (!userId || typeof userId !== 'string') {
-    return res.status(400).json({ error: 'User ID is required' });
-  }
-
   try {
-    const user = await clerkClient.users.getUser(userId);
-    if (!user?.imageUrl) {
-      // If no image URL is found, return a 404 with null image
-      return res.status(404).json({ imageUrl: null });
+    const { userId } = req.query;
+
+    if (!userId || typeof userId !== 'string') {
+      return res.status(400).json({ error: 'User ID is required' });
     }
-    return res.status(200).json({ imageUrl: user.imageUrl });
+
+    const user = await clerk.users.getUser(userId);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const imageUrl = user.imageUrl;
+    
+    return res.status(200).json({ imageUrl });
   } catch (error) {
-    // Instead of returning a 500 error, return a 404 with null image
-    // This prevents error logging for expected cases of missing users
-    return res.status(404).json({ imageUrl: null });
+    console.error('Error in user-image API:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 } 

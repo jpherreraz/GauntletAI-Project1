@@ -16,7 +16,9 @@ export const fileService = {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to upload file');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Upload error response:', errorData);
+        throw new Error(errorData.error || 'Failed to upload file');
       }
 
       return await response.json();

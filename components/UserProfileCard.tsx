@@ -10,7 +10,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { UserProfile } from '@/src/services/userService'
+import { UserProfile, UserStatus } from '@/src/services/userService'
 import { useState } from 'react'
 import { MessageSquare } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -36,32 +36,28 @@ const statusText = {
 } as const
 
 export function UserProfileCard({ isOpen, onClose, user }: UserProfileCardProps) {
-  const [status] = useState<keyof typeof statusColors>(user.status || 'online')
+  const [status] = useState<UserStatus>(user.status || 'online')
   const [bio] = useState<string>(user.bio || '')
   const router = useRouter()
 
   const handleStartDM = () => {
-    // Close the modal first
     onClose();
 
-    // Create the DM info
     const userInfo: UserProfile = {
       userId: user.userId,
+      fullName: user.fullName,
       username: user.username,
       imageUrl: user.imageUrl,
-      fullName: user.fullName,
       status: user.status,
       bio: user.bio
     };
 
-    // Navigate to the correct path (without the auth group in URL)
     router.push(`/channels/me/${user.userId}`);
-    
-    // Dispatch event after navigation
     window.dispatchEvent(new CustomEvent('startDM', { detail: userInfo }));
   };
 
-  const userInitial = user.username[0] || '?';
+  const displayName = user.username || user.fullName;
+  const userInitial = displayName[0].toUpperCase();
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -69,14 +65,14 @@ export function UserProfileCard({ isOpen, onClose, user }: UserProfileCardProps)
         <DialogHeader>
           <DialogTitle>User Profile</DialogTitle>
           <DialogDescription>
-            View and interact with {user.username}'s profile
+            View and interact with {displayName}'s profile
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="flex items-center justify-center">
             <div className="relative">
               <Avatar className="h-24 w-24">
-                <AvatarImage src={user.imageUrl} alt={user.username} />
+                <AvatarImage src={user.imageUrl} alt={displayName} />
                 <AvatarFallback>{userInitial}</AvatarFallback>
               </Avatar>
               <div className={cn(
@@ -87,7 +83,7 @@ export function UserProfileCard({ isOpen, onClose, user }: UserProfileCardProps)
           </div>
           <div className="text-center">
             <h3 className="text-lg font-semibold">
-              {user.fullName || user.username}
+              {displayName}
             </h3>
             <p className="text-sm text-muted-foreground">
               {statusText[status]}

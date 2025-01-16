@@ -1,9 +1,12 @@
+export type UserStatus = 'online' | 'idle' | 'dnd' | 'invisible';
+
 export interface UserProfile {
   userId: string;
-  username: string;
-  imageUrl: string;
-  status: 'online' | 'idle' | 'dnd' | 'invisible';
-  bio: string | null;
+  fullName: string;
+  username?: string;
+  imageUrl?: string;
+  status?: UserStatus;
+  bio?: string;
 }
 
 export const userService = {
@@ -24,7 +27,10 @@ export const userService = {
 
       const data = await response.json();
       console.log('Got user profile:', data);
-      return data;
+      return {
+        userId,
+        fullName: data?.fullName || 'Anonymous'
+      };
     } catch (error) {
       console.error('Error in getUserProfile:', {
         error,
@@ -60,7 +66,10 @@ export const userService = {
 
       const data = await response.json();
       console.log('Updated profile:', data);
-      return data;
+      return {
+        userId,
+        fullName: data?.fullName || 'Anonymous'
+      };
     } catch (error) {
       console.error('Error in updateUserProfile:', {
         error,
