@@ -51,15 +51,6 @@ export const ThreadView: FC<ThreadViewProps> = ({
 
   return (
     <div className="h-full flex flex-col bg-gray-900">
-      {/* Debug info */}
-      <div className="absolute top-0 left-0 bg-black/50 text-white p-2 text-xs z-50">
-        Parent ID: {parentMessage.id}
-        <br />
-        Parent Text: {parentMessage.text.slice(0, 20)}...
-        <br />
-        Replies: {replies.length}
-      </div>
-
       {/* Thread Header */}
       <div className="border-b border-gray-800 p-4 bg-gray-900 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-100">Thread</h2>

@@ -43,7 +43,23 @@ export const MessageBox: FC<MessageBoxProps> = ({
     if (!user) return;
 
     try {
-      setIsLoading(true);
+      // Optimistically add the message to the UI
+      const optimisticMessage = {
+        id: Date.now().toString(), // Temporary ID
+        text,
+        fullName: user.fullName || 'Anonymous',
+        userId: user.id,
+        channelId: channel,
+        timestamp: Date.now(),
+        replyToId: parentId,
+        replyTo: parentId ? {
+          id: parentId,
+          text: messages.find(m => m.id === parentId)?.text || '',
+          fullName: messages.find(m => m.id === parentId)?.fullName || ''
+        } : undefined
+      };
+      
+      setMessages(prev => [...prev, optimisticMessage]);
 
       await messageService.sendMessage({
         channelId: channel,
@@ -57,11 +73,11 @@ export const MessageBox: FC<MessageBoxProps> = ({
         } : undefined
       });
 
-      await fetchMessages();
+      // Quietly fetch the latest messages
+      const fetchedMessages = await messageService.getMessages(channel);
+      setMessages(fetchedMessages);
     } catch (error) {
       console.error('Error sending message:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
