@@ -8,8 +8,13 @@ const inter = Inter({
 })
 
 export const metadata = {
-  title: 'Gauntlet AI',
+  title: 'ChatGenius',
   description: 'A modern chat application',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' }
+    ]
+  }
 }
 
 export default function RootLayout({
