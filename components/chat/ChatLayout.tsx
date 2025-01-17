@@ -33,6 +33,13 @@ export default function ChatLayout({
   const { activeThread, setActiveThread } = useThread();
   const [newMessageSent, setNewMessageSent] = useState(false);
 
+  // Close thread view when channel changes
+  useEffect(() => {
+    if (activeThread) {
+      setActiveThread(null);
+    }
+  }, [channelId]);
+
   // Log initial mount and cleanup
   useEffect(() => {
     console.log('ChatLayout: mounted with thread context:', {
