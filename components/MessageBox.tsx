@@ -2,8 +2,7 @@ import { FC, useState, useEffect, useCallback } from 'react';
 import { messageService } from '@/src/services/messageService';
 import { Message } from '@/src/types/message';
 import { ChatHeader } from './chat/ChatHeader';
-import { ChatMessages } from './chat/ChatMessages';
-import { ChatInput } from './chat/ChatInput';
+import ChatLayout from './chat/ChatLayout';
 import { useUser } from '@clerk/nextjs';
 
 interface MessageBoxProps {
@@ -21,8 +20,6 @@ export const MessageBox: FC<MessageBoxProps> = ({
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [newMessageSent, setNewMessageSent] = useState(false);
-  const [replyTo, setReplyTo] = useState<Message | null>(null);
   const { user } = useUser();
 
   const fetchMessages = useCallback(async () => {
@@ -42,38 +39,30 @@ export const MessageBox: FC<MessageBoxProps> = ({
     return () => clearInterval(interval);
   }, [fetchMessages]);
 
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (text: string, parentId?: string) => {
     if (!user) return;
 
     try {
       setIsLoading(true);
-      setNewMessageSent(true);
 
       await messageService.sendMessage({
         channelId: channel,
         text,
         fullName: user.fullName || 'Anonymous',
-        replyToId: replyTo?.id,
-        replyTo: replyTo ? {
-          id: replyTo.id,
-          text: replyTo.text,
-          fullName: replyTo.fullName
+        replyToId: parentId,
+        replyTo: parentId ? {
+          id: parentId,
+          text: messages.find(m => m.id === parentId)?.text || '',
+          fullName: messages.find(m => m.id === parentId)?.fullName || ''
         } : undefined
       });
 
-      setReplyTo(null);
       await fetchMessages();
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
       setIsLoading(false);
-      setTimeout(() => setNewMessageSent(false), 100);
     }
-  };
-
-  const handleReplyClick = (message: Message) => {
-    console.log('Reply clicked:', message);
-    setReplyTo(message);
   };
 
   return (
@@ -84,19 +73,15 @@ export const MessageBox: FC<MessageBoxProps> = ({
         recipientName={recipientName}
         recipientId={recipientId}
       />
-      <ChatMessages 
-        messages={messages} 
-        isLoading={isLoading} 
-        newMessageSent={newMessageSent}
-        onReplyClick={handleReplyClick}
-        setMessages={setMessages}
+      <ChatLayout
+        messages={messages}
+        loading={isLoading}
+        onSendMessage={handleSendMessage}
         channelId={channel}
-      />
-      <ChatInput 
-        onSendMessage={handleSendMessage} 
-        isLoading={isLoading}
-        replyTo={replyTo}
-        onCancelReply={() => setReplyTo(null)}
+        setMessages={setMessages}
+        isDM={isDM}
+        recipientName={recipientName}
+        recipientId={recipientId}
       />
     </div>
   );

@@ -1,32 +1,65 @@
 'use client'
 
-import { createContext, useContext, useState } from 'react';
-import { SettingsMenu } from '@/components/SettingsMenu';
-import { useUser } from '@clerk/nextjs';
+import { createContext, useContext, useState, useCallback, FC, ReactNode } from 'react';
+
+interface Settings {
+  sidebarCollapsed: boolean;
+  theme: 'light' | 'dark';
+  notifications: boolean;
+}
 
 interface SettingsContextType {
-  isOpen: boolean;
-  setIsOpen: (isOpen: boolean) => void;
+  settings: Settings;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  setTheme: (theme: 'light' | 'dark') => void;
+  setNotifications: (enabled: boolean) => void;
 }
+
+const defaultSettings: Settings = {
+  sidebarCollapsed: false,
+  theme: 'dark',
+  notifications: true
+};
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
-export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const { user } = useUser();
-
-  return (
-    <SettingsContext.Provider value={{ isOpen, setIsOpen }}>
-      {children}
-      {user && <SettingsMenu isOpen={isOpen} onClose={() => setIsOpen(false)} user={user} />}
-    </SettingsContext.Provider>
-  );
-}
-
-export function useSettings() {
+export const useSettings = () => {
   const context = useContext(SettingsContext);
   if (context === undefined) {
     throw new Error('useSettings must be used within a SettingsProvider');
   }
   return context;
-} 
+};
+
+interface SettingsProviderProps {
+  children: ReactNode;
+}
+
+export const SettingsProvider: FC<SettingsProviderProps> = ({ children }) => {
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
+
+  const setSidebarCollapsed = useCallback((collapsed: boolean) => {
+    setSettings(prev => ({ ...prev, sidebarCollapsed: collapsed }));
+  }, []);
+
+  const setTheme = useCallback((theme: 'light' | 'dark') => {
+    setSettings(prev => ({ ...prev, theme }));
+  }, []);
+
+  const setNotifications = useCallback((enabled: boolean) => {
+    setSettings(prev => ({ ...prev, notifications: enabled }));
+  }, []);
+
+  return (
+    <SettingsContext.Provider
+      value={{
+        settings,
+        setSidebarCollapsed,
+        setTheme,
+        setNotifications
+      }}
+    >
+      {children}
+    </SettingsContext.Provider>
+  );
+}; 

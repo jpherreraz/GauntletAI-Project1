@@ -10,13 +10,15 @@ interface ChatInputProps {
   isLoading?: boolean;
   replyTo?: Message | null;
   onCancelReply?: () => void;
+  placeholder?: string;
 }
 
 export const ChatInput: FC<ChatInputProps> = ({ 
   onSendMessage, 
   isLoading,
   replyTo,
-  onCancelReply 
+  onCancelReply,
+  placeholder = "Type a message..." 
 }) => {
   const [text, setText] = useState('');
 
@@ -58,7 +60,7 @@ export const ChatInput: FC<ChatInputProps> = ({
               handleSend();
             }
           }}
-          placeholder="Type a message..."
+          placeholder={placeholder}
           className="w-full bg-gray-800 text-white rounded px-4 py-2 pr-10"
           disabled={isLoading}
         />

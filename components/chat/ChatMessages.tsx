@@ -1,16 +1,17 @@
-import { FC, useEffect, useRef, useState } from 'react';
+import { FC, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Message as MessageType } from '@/src/types/message';
 import { Message } from './Message';
 import { useUser } from '@clerk/nextjs';
 import { messageService } from '@/src/services/messageService';
 import { formatDate } from '@/lib/utils';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { useThread } from '@/contexts/ThreadContext';
 
 interface ChatMessagesProps {
   messages: MessageType[];
   isLoading: boolean;
-  newMessageSent?: boolean;
-  onReplyClick?: (message: MessageType) => void;
+  newMessageSent: boolean;
+  onReplyClick: (message: MessageType | null) => void;
   setMessages: React.Dispatch<React.SetStateAction<MessageType[]>>;
   channelId: string;
 }
@@ -24,104 +25,14 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   channelId
 }) => {
   const { user } = useUser();
+  const { setActiveThread } = useThread();
+  const parentRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const lastMessageCountRef = useRef(messages.length);
   const isInitialLoadRef = useRef(true);
-  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
   const [lastMessageTimestamp, setLastMessageTimestamp] = useState<number>(0);
 
-  // Group messages by date
-  const groupedMessages = messages.reduce<{ date: string; messages: MessageType[] }[]>((groups, message) => {
-    const date = formatDate(message.timestamp);
-    const lastGroup = groups[groups.length - 1];
-
-    if (lastGroup && lastGroup.date === date) {
-      lastGroup.messages.push(message);
-    } else {
-      groups.push({ date, messages: [message] });
-    }
-
-    return groups;
-  }, []);
-
-  // Handle initial load scroll
-  useEffect(() => {
-    if (isInitialLoadRef.current && messages.length > 0 && scrollAreaRef.current) {
-      const { scrollHeight } = scrollAreaRef.current;
-      scrollAreaRef.current.scrollTop = scrollHeight;
-      isInitialLoadRef.current = false;
-    }
-  }, [messages]);
-
-  // Handle message updates and new messages
-  useEffect(() => {
-    // Always scroll to bottom when user sends a new message
-    if (newMessageSent && scrollAreaRef.current) {
-      const { scrollHeight } = scrollAreaRef.current;
-      scrollAreaRef.current.scrollTop = scrollHeight;
-      return;
-    }
-
-    // Auto-scroll only if user is near bottom and receiving new messages
-    if (scrollAreaRef.current && messages.length > lastMessageCountRef.current) {
-      const { scrollHeight, scrollTop, clientHeight } = scrollAreaRef.current;
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-      
-      if (isNearBottom) {
-        scrollAreaRef.current.scrollTop = scrollHeight;
-      }
-    }
-    
-    lastMessageCountRef.current = messages.length;
-  }, [messages, newMessageSent]);
-
-  // Reset initial load flag when channel changes
-  useEffect(() => {
-    isInitialLoadRef.current = true;
-  }, [messages.length === 0]); // Reset when messages are cleared (channel change)
-
-  const toggleThread = (messageId: string) => {
-    setExpandedThreads(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(messageId)) {
-        newSet.delete(messageId);
-      } else {
-        newSet.add(messageId);
-      }
-      return newSet;
-    });
-  };
-
-  // Group replies with their parent messages
-  const organizeMessages = (messages: MessageType[]) => {
-    const messageMap = new Map<string, MessageType>();
-    const repliesMap = new Map<string, MessageType[]>();
-
-    messages.forEach(message => {
-      messageMap.set(message.id, message);
-      if (!repliesMap.has(message.id)) {
-        repliesMap.set(message.id, []);
-      }
-    });
-
-    messages.forEach(message => {
-      if (message.replyToId) {
-        const replies = repliesMap.get(message.replyToId) || [];
-        replies.push(message);
-        repliesMap.set(message.replyToId, replies.sort((a, b) => a.timestamp - b.timestamp));
-      }
-    });
-
-    return messages
-      .filter(message => !message.replyToId)
-      .sort((a, b) => a.timestamp - b.timestamp)
-      .map(message => ({
-        message,
-        replies: repliesMap.get(message.id) || []
-      }));
-  };
-
+  // Handle reactions
   const handleReaction = async (messageId: string, emoji: string) => {
     if (!user?.id) return;
 
@@ -150,7 +61,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         messageId,
         emoji,
         userId: user.id,
-        channelId: messages.find(m => m.id === messageId)?.channelId || ''
+        channelId
       });
     } catch (error) {
       console.error('Error toggling reaction:', error);
@@ -158,58 +69,88 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
   };
 
-  const parentRef = useRef<HTMLDivElement>(null);
-  
+  // Create a single stable handler for thread viewing
+  const handleViewThread = useCallback((message: MessageType) => {
+    console.log('ChatMessages: handleViewThread called with:', {
+      messageId: message.id,
+      hasSetActiveThread: typeof setActiveThread === 'function'
+    });
+
+    if (typeof setActiveThread === 'function') {
+      console.log('ChatMessages: setting active thread');
+      setActiveThread(message);
+    } else {
+      console.warn('ChatMessages: setActiveThread is not available');
+    }
+  }, [setActiveThread]);
+
+  // Log when component mounts
+  useEffect(() => {
+    console.log('ChatMessages: mounted with thread context:', {
+      hasSetActiveThread: typeof setActiveThread === 'function'
+    });
+  }, [setActiveThread]);
+
+  // Group messages by date - memoized
+  const groupedMessages = useMemo(() => {
+    console.log('ChatMessages: grouping messages, length:', messages.length);
+    const groups: { date: string; messages: MessageType[] }[] = [];
+    let currentDate = '';
+    let currentGroup: MessageType[] = [];
+
+    messages.forEach(message => {
+      if (!message.replyToId) {
+        const date = formatDate(message.timestamp);
+        if (date !== currentDate) {
+          if (currentGroup.length > 0) {
+            groups.push({ date: currentDate, messages: currentGroup });
+          }
+          currentDate = date;
+          currentGroup = [message];
+        } else {
+          currentGroup.push(message);
+        }
+      }
+    });
+
+    if (currentGroup.length > 0) {
+      groups.push({ date: currentDate, messages: currentGroup });
+    }
+
+    return groups;
+  }, [messages]);
+
+  // Create virtualizer with stable dependencies
   const virtualizer = useVirtualizer({
     count: groupedMessages.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 100, // Estimate average height of a message group
-    overscan: 5 // Number of items to render outside of view
+    estimateSize: useCallback(() => 100, []),
+    overscan: 3,
+    initialRect: { width: 0, height: 0 }
   });
 
-  // Update lastMessageTimestamp when messages change
-  useEffect(() => {
-    if (messages.length > 0) {
-      const maxTimestamp = Math.max(...messages.map(m => m.timestamp));
-      setLastMessageTimestamp(maxTimestamp);
-    }
-  }, [messages]);
-
-  // Polling effect
-  useEffect(() => {
-    if (!channelId) return;
-
-    const fetchNewMessages = async () => {
-      try {
-        if (lastMessageTimestamp > 0) {
-          const newMessages = await messageService.getMessagesSince(channelId, lastMessageTimestamp);
-          if (newMessages.length > 0) {
-            setMessages((prev: MessageType[]) => {
-              const merged = [...prev];
-              newMessages.forEach(newMsg => {
-                const index = merged.findIndex(m => m.id === newMsg.id);
-                if (index === -1) {
-                  merged.push(newMsg);
-                } else {
-                  merged[index] = newMsg;
-                }
-              });
-              return merged.sort((a, b) => a.timestamp - b.timestamp);
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching new messages:', error);
-      }
-    };
-
-    const interval = setInterval(fetchNewMessages, 1000);
-    return () => clearInterval(interval);
-  }, [channelId, lastMessageTimestamp, setMessages]);
+  // Memoize the message renderer with stable dependencies
+  const renderMessage = useCallback((message: MessageType, index: number, groupMessages: MessageType[]) => {
+    const replies = messages.filter(m => m.replyToId === message.id);
+    
+    return (
+      <Message
+        key={message.id}
+        message={message}
+        onReplyClick={onReplyClick}
+        hasReplies={replies.length > 0}
+        replies={replies}
+        onReactionSelect={handleReaction}
+        userId={user?.id}
+        onViewThread={handleViewThread}
+        prevMessage={index > 0 ? groupMessages[index - 1] : undefined}
+      />
+    );
+  }, [onReplyClick, handleReaction, user?.id, messages, handleViewThread]);
 
   if (isLoading) {
     return (
-      <div className="h-[calc(100vh-8rem)] overflow-hidden bg-gray-900">
+      <div className="flex-1 min-h-0 bg-gray-900">
         <div className="h-full p-4 overflow-y-auto">
           <div className="text-gray-400">Loading messages...</div>
         </div>
@@ -218,11 +159,20 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   }
 
   return (
-    <div className="h-[calc(100vh-8rem)] overflow-hidden bg-gray-900">
+    <div className="flex-1 min-h-0 bg-gray-900">
       <div 
         ref={parentRef}
-        className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900"
+        className="h-full overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
       >
+        {/* Debug overlay */}
+        <div className="fixed top-12 right-0 bg-black/50 text-white p-2 text-xs z-50">
+          Messages: {messages.length}
+          <br />
+          Has Handler: {typeof handleViewThread === 'function' ? 'yes' : 'no'}
+          <br />
+          Has setActiveThread: {typeof setActiveThread === 'function' ? 'yes' : 'no'}
+        </div>
+
         <div
           style={{
             height: `${virtualizer.getTotalSize()}px`,
@@ -232,16 +182,15 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         >
           {virtualizer.getVirtualItems().map((virtualRow) => {
             const group = groupedMessages[virtualRow.index];
+            if (!group) return null;
+            
             return (
               <div
                 key={virtualRow.index}
                 data-index={virtualRow.index}
                 ref={virtualizer.measureElement}
+                className="absolute top-0 left-0 w-full"
                 style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
                   transform: `translateY(${virtualRow.start}px)`
                 }}
               >
@@ -253,20 +202,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
                   </div>
                   
                   <div className="space-y-0">
-                    {group.messages.map((message, messageIndex) => (
-                      <Message
-                        key={message.id}
-                        message={message}
-                        onReplyClick={onReplyClick}
-                        hasReplies={messages.filter(m => m.replyToId === message.id).length > 0}
-                        isExpanded={expandedThreads.has(message.id)}
-                        onToggleReplies={() => toggleThread(message.id)}
-                        replies={messages.filter(m => m.replyToId === message.id)}
-                        prevMessage={messageIndex > 0 ? group.messages[messageIndex - 1] : undefined}
-                        onReactionSelect={handleReaction}
-                        userId={user?.id}
-                      />
-                    ))}
+                    {group.messages.map((message, index) => renderMessage(message, index, group.messages))}
                   </div>
                 </div>
               </div>
@@ -277,4 +213,4 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       </div>
     </div>
   );
-}; 
+};

@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from 'next/navigation'
 import { UserProfile } from '@/src/services/userService'
 import { dmListService } from '@/src/services/dmListService'
-import { ChatMessages } from '@/components/chat/ChatMessages'
+import { ThreadProvider } from '@/contexts/ThreadContext'
 
 type ExploreView = 'none' | 'servers' | 'bots';
 type ViewMode = 'channels' | 'dms' | 'explore';
@@ -170,11 +170,11 @@ export function ClientChatLayout({
 
   return (
     <div className="h-screen flex overflow-hidden">
-      <NavigationSidebar 
-        viewMode={viewMode} 
+      <NavigationSidebar
+        viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
       />
-      <Sidebar 
+      <Sidebar
         currentChannel={currentChannel}
         onChannelChange={handleChannelChange}
         username={user?.firstName || 'Anonymous'}
@@ -187,8 +187,12 @@ export function ClientChatLayout({
         selectedDMUserId={selectedDMUserId || ''}
         onDMListChange={setDmUsers}
       />
-      <main className="flex-1 flex flex-col min-w-0">
-        {getMainContent()}
+      <main className="flex-1 relative overflow-hidden">
+        <ThreadProvider>
+          <div className="absolute inset-0">
+            {children}
+          </div>
+        </ThreadProvider>
       </main>
     </div>
   );
