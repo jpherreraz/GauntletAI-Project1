@@ -31,7 +31,9 @@ export function useMessages(channelId: string) {
       const newMessage = await messageService.sendMessage({
         text,
         channelId,
-        fullName: user.fullName || 'Unknown User'
+        fullName: user.fullName || 'Unknown User',
+        userId: user.id,
+        imageUrl: user.imageUrl || ''
       });
       setMessages(prev => [...prev, newMessage]);
     } catch (error) {

@@ -70,7 +70,12 @@ export const ThreadView: FC<ThreadViewProps> = ({
       {/* Thread Messages */}
       <div className="flex-1 overflow-y-auto p-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
         <div className="mb-4">
-          <Message message={parentMessage} onViewThread={() => {}} />
+          <Message 
+            message={parentMessage} 
+            onViewThread={() => {}} 
+            onReactionSelect={onReactionSelect}
+            userId={userId}
+          />
           <div className="mt-2 ml-4 flex items-center gap-2">
             <div className="h-px flex-1 bg-gray-800"></div>
             <span className="text-xs text-gray-400">{replies.length} {replies.length === 1 ? 'reply' : 'replies'}</span>
@@ -84,6 +89,8 @@ export const ThreadView: FC<ThreadViewProps> = ({
               message={reply} 
               onViewThread={() => {}} 
               prevMessage={index > 0 ? replies[index - 1] : undefined}
+              onReactionSelect={onReactionSelect}
+              userId={userId}
             />
           ))}
         </div>

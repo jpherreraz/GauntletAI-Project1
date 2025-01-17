@@ -7,6 +7,8 @@ import { ChatInput } from './ChatInput';
 import { ChatMessages } from './ChatMessages';
 import { ThreadView } from './ThreadView';
 import { ChatHeader } from './ChatHeader';
+import { messageService } from '@/src/services/messageService';
+import { useUser } from '@clerk/nextjs';
 
 interface ChatLayoutProps {
   messages: MessageType[];
@@ -32,6 +34,7 @@ export default function ChatLayout({
   const renderCount = useRef(0);
   const { activeThread, setActiveThread } = useThread();
   const [newMessageSent, setNewMessageSent] = useState(false);
+  const { user } = useUser();
 
   // Close thread view when channel changes
   useEffect(() => {
@@ -117,6 +120,38 @@ export default function ChatLayout({
               setActiveThread(null);
             }}
             onSendReply={(text: string) => onSendMessage(text, activeThread.id)}
+            onReactionSelect={async (messageId: string, emoji: string) => {
+              if (!user?.id) return;
+              try {
+                await messageService.toggleReaction({
+                  messageId,
+                  emoji,
+                  userId: user.id,
+                  channelId
+                });
+                const updatedMessages = messages.map(msg => {
+                  if (msg.id === messageId) {
+                    const currentReactions = msg.reactions || {};
+                    const currentUsers = currentReactions[emoji] || [];
+                    const hasReacted = currentUsers.includes(user.id);
+                    return {
+                      ...msg,
+                      reactions: {
+                        ...currentReactions,
+                        [emoji]: hasReacted
+                          ? currentUsers.filter(id => id !== user.id)
+                          : [...currentUsers, user.id]
+                      }
+                    };
+                  }
+                  return msg;
+                });
+                setMessages(updatedMessages);
+              } catch (error) {
+                console.error('Error toggling reaction in thread:', error);
+              }
+            }}
+            userId={user?.id}
           />
         </div>
       )}

@@ -6,6 +6,7 @@ import { messageService } from '@/src/services/messageService';
 import { formatDate } from '@/lib/utils';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useThread } from '@/contexts/ThreadContext';
+import { useInView } from 'react-intersection-observer';
 
 interface ChatMessagesProps {
   messages: MessageType[];
@@ -33,36 +34,137 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const [lastMessageTimestamp, setLastMessageTimestamp] = useState<number>(0);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const lastScrollTopRef = useRef(0);
+
+  // Use intersection observer to track if bottom is visible
+  const { ref: bottomRef, inView: isBottomVisible } = useInView({
+    threshold: 0.1,
+    root: parentRef.current,
+    rootMargin: '50px',
+    onChange: (inView) => {
+      if (inView) {
+        setUnreadCount(0);
+        setIsAtBottom(true);
+      }
+    }
+  });
 
   // Track scroll position
   const handleScroll = useCallback(() => {
     if (!parentRef.current) return;
+    const element = parentRef.current;
+    const maxScroll = element.scrollHeight - element.clientHeight;
+    const currentScroll = element.scrollTop;
+    const scrolledToBottom = maxScroll - currentScroll < 50;
     
-    const { scrollHeight, scrollTop, clientHeight } = parentRef.current;
-    const scrolledToBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < 10;
-    setIsAtBottom(scrolledToBottom);
+    lastScrollTopRef.current = currentScroll;
     
+    console.log('Scroll debug:', {
+      maxScroll,
+      currentScroll,
+      scrolledToBottom,
+      isBottomVisible,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+      difference: maxScroll - currentScroll,
+      unreadCount
+    });
+
     if (scrolledToBottom) {
+      setIsAtBottom(true);
       setUnreadCount(0);
+    } else {
+      setIsAtBottom(false);
     }
-  }, []);
+  }, [isBottomVisible]);
+
+  // Scroll to bottom
+  const scrollToBottom = useCallback(() => {
+    if (!parentRef.current) return;
+    
+    const element = parentRef.current;
+    element.scrollTop = element.scrollHeight;
+    setIsAtBottom(true);
+    setUnreadCount(0);
+    
+    // Force a scroll event to update state
+    handleScroll();
+  }, [handleScroll]);
 
   // Watch for new messages
   useEffect(() => {
-    if (!isAtBottom && messages.length > lastMessageCountRef.current && !newMessageSent) {
-      setUnreadCount(prev => prev + (messages.length - lastMessageCountRef.current));
+    // Skip initial load
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      lastMessageCountRef.current = messages.length;
+      return;
     }
-    lastMessageCountRef.current = messages.length;
-  }, [messages.length, isAtBottom, newMessageSent]);
 
-  // Add scroll event listener
+    // Only check for new messages if we have more messages than before
+    if (messages.length > lastMessageCountRef.current) {
+      const newMessageCount = messages.length - lastMessageCountRef.current;
+      
+      if (newMessageSent || isAtBottom || isBottomVisible) {
+        // Scroll to bottom when sending a message or when already at bottom
+        setTimeout(() => {
+          requestAnimationFrame(() => {
+            scrollToBottom();
+          });
+        }, 100);
+      } else {
+        // Update unread count for messages from others when not at bottom
+        setUnreadCount(prev => prev + newMessageCount);
+      }
+
+      lastMessageCountRef.current = messages.length;
+    }
+  }, [messages.length, isAtBottom, isBottomVisible, newMessageSent, scrollToBottom]);
+
+  // Add scroll event listener and initial position
   useEffect(() => {
     const scrollElement = parentRef.current;
     if (scrollElement) {
+      // Set initial scroll position with a delay to ensure content is rendered
+      setTimeout(() => {
+        requestAnimationFrame(() => {
+          scrollToBottom();
+        });
+      }, 100);
+      
       scrollElement.addEventListener('scroll', handleScroll);
       return () => scrollElement.removeEventListener('scroll', handleScroll);
     }
-  }, [handleScroll]);
+  }, [handleScroll, scrollToBottom]);
+
+  // Initial scroll only
+  useEffect(() => {
+    if (!isLoading) {
+      setTimeout(() => {
+        requestAnimationFrame(() => {
+          scrollToBottom();
+          isInitialLoadRef.current = false;
+        });
+      }, 100);
+    }
+  }, [isLoading, scrollToBottom]);
+
+  // Handle new message sent
+  useEffect(() => {
+    if (newMessageSent) {
+      setTimeout(() => {
+        requestAnimationFrame(() => {
+          scrollToBottom();
+        });
+      }, 100);
+    }
+  }, [newMessageSent, scrollToBottom]);
+
+  // Clear unread count when bottom becomes visible
+  useEffect(() => {
+    if (isBottomVisible || isAtBottom) {
+      setUnreadCount(0);
+    }
+  }, [isBottomVisible, isAtBottom]);
 
   // Group messages by date - memoized
   const groupedMessages = useMemo(() => {
@@ -98,35 +200,15 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     count: groupedMessages.length,
     getScrollElement: () => parentRef.current,
     estimateSize: useCallback(() => 100, []),
-    overscan: 3,
-    initialRect: { width: 0, height: 0 },
-    initialOffset: Number.MAX_SAFE_INTEGER // Start at bottom
+    overscan: 5,
+    scrollToFn: (offset, { behavior }) => {
+      const element = parentRef.current;
+      if (!element) return;
+      
+      element.scrollTop = offset;
+      handleScroll();
+    }
   });
-
-  // Scroll to bottom on initial load and new messages
-  const scrollToBottom = useCallback(() => {
-    if (groupedMessages.length > 0) {
-      virtualizer.scrollToIndex(groupedMessages.length - 1, { align: 'end', behavior: 'auto' });
-    }
-  }, [virtualizer, groupedMessages.length]);
-
-  // Initial scroll
-  useEffect(() => {
-    if (groupedMessages.length > 0 && !isLoading) {
-      // Try immediately
-      scrollToBottom();
-      // And after a short delay to ensure content is rendered
-      const timer = setTimeout(scrollToBottom, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [groupedMessages.length, isLoading, scrollToBottom]);
-
-  // Scroll only when user sends a new message
-  useEffect(() => {
-    if (newMessageSent) {
-      scrollToBottom();
-    }
-  }, [newMessageSent, scrollToBottom]);
 
   // Handle reactions
   const handleReaction = async (messageId: string, emoji: string) => {
@@ -218,7 +300,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
   return (
     <div className="flex-1 min-h-0 bg-gray-900 flex flex-col">
-      {!isAtBottom && unreadCount > 0 && (
+      {!isBottomVisible && unreadCount > 0 && (
         <div className="bg-indigo-600 text-white py-2 px-4 flex items-center justify-between shrink-0">
           <div 
             className="cursor-pointer hover:underline"
@@ -236,7 +318,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       )}
       <div 
         ref={parentRef}
-        className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
+        className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] relative"
       >
         <div
           style={{
@@ -274,7 +356,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
             );
           })}
         </div>
-        <div ref={messagesEndRef} />
+        {/* Bottom observer */}
+        <div ref={bottomRef} className="absolute bottom-0 left-0 w-full h-px opacity-0 pointer-events-none" />
       </div>
     </div>
   );

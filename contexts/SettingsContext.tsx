@@ -6,6 +6,7 @@ interface Settings {
   sidebarCollapsed: boolean;
   theme: 'light' | 'dark';
   notifications: boolean;
+  isOpen: boolean;
 }
 
 interface SettingsContextType {
@@ -13,12 +14,15 @@ interface SettingsContextType {
   setSidebarCollapsed: (collapsed: boolean) => void;
   setTheme: (theme: 'light' | 'dark') => void;
   setNotifications: (enabled: boolean) => void;
+  isOpen: boolean;
+  setIsOpen: (isOpen: boolean) => void;
 }
 
 const defaultSettings: Settings = {
   sidebarCollapsed: false,
   theme: 'dark',
-  notifications: true
+  notifications: true,
+  isOpen: false
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -50,13 +54,19 @@ export const SettingsProvider: FC<SettingsProviderProps> = ({ children }) => {
     setSettings(prev => ({ ...prev, notifications: enabled }));
   }, []);
 
+  const setIsOpen = useCallback((isOpen: boolean) => {
+    setSettings(prev => ({ ...prev, isOpen }));
+  }, []);
+
   return (
     <SettingsContext.Provider
       value={{
         settings,
         setSidebarCollapsed,
         setTheme,
-        setNotifications
+        setNotifications,
+        isOpen: settings.isOpen,
+        setIsOpen
       }}
     >
       {children}

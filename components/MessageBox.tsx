@@ -65,6 +65,8 @@ export const MessageBox: FC<MessageBoxProps> = ({
         channelId: channel,
         text,
         fullName: user.fullName || 'Anonymous',
+        userId: user.id,
+        imageUrl: user.imageUrl || '',
         replyToId: parentId,
         replyTo: parentId ? {
           id: parentId,
