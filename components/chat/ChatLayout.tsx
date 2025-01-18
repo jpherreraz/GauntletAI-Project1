@@ -35,6 +35,7 @@ export default function ChatLayout({
   const { activeThread, setActiveThread } = useThread();
   const [newMessageSent, setNewMessageSent] = useState(false);
   const { user } = useUser();
+  const mainInputRef = useRef<HTMLInputElement>(null);
 
   // Close thread view when channel changes
   useEffect(() => {
@@ -106,7 +107,8 @@ export default function ChatLayout({
               onSendMessage(text);
               setNewMessageSent(true);
               setTimeout(() => setNewMessageSent(false), 100);
-            }} 
+            }}
+            ref={mainInputRef}
           />
         </div>
       </div>
@@ -118,6 +120,9 @@ export default function ChatLayout({
             onClose={() => {
               console.log('ChatLayout: closing thread view');
               setActiveThread(null);
+            }}
+            onThreadClose={() => {
+              mainInputRef.current?.focus();
             }}
             onSendReply={(text: string) => onSendMessage(text, activeThread.id)}
             onReactionSelect={async (messageId: string, emoji: string) => {

@@ -14,6 +14,7 @@ interface ThreadViewProps {
   onSendReply: (text: string) => void;
   onReactionSelect?: (messageId: string, emoji: string) => void;
   userId?: string;
+  onThreadClose?: () => void;
 }
 
 export const ThreadView: FC<ThreadViewProps> = ({
@@ -22,7 +23,8 @@ export const ThreadView: FC<ThreadViewProps> = ({
   onClose,
   onSendReply,
   onReactionSelect,
-  userId
+  userId,
+  onThreadClose
 }) => {
   console.log('ThreadView: Rendering with props:', {
     parentMessage: {
@@ -61,6 +63,7 @@ export const ThreadView: FC<ThreadViewProps> = ({
           onClick={() => {
             console.log('ThreadView: close button clicked');
             onClose();
+            onThreadClose?.();
           }}
         >
           <X className="h-5 w-5" />
@@ -101,6 +104,7 @@ export const ThreadView: FC<ThreadViewProps> = ({
         <ChatInput
           onSendMessage={onSendReply}
           placeholder="Reply in thread..."
+          focusOnMount={true}
         />
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { FC, useState } from 'react';
+import { FC, useState, useEffect, useRef, forwardRef } from 'react';
 import { Reply, X, SmilePlus } from 'lucide-react';
 import { Message } from '@/src/types/message';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -11,16 +11,40 @@ interface ChatInputProps {
   replyTo?: Message | null;
   onCancelReply?: () => void;
   placeholder?: string;
+  focusOnMount?: boolean;
 }
 
-export const ChatInput: FC<ChatInputProps> = ({ 
+export const ChatInput = forwardRef<HTMLInputElement, ChatInputProps>(({ 
   onSendMessage, 
   isLoading,
   replyTo,
   onCancelReply,
-  placeholder = "Type a message..." 
-}) => {
+  placeholder = "Type a message...",
+  focusOnMount = false
+}, ref) => {
   const [text, setText] = useState('');
+  const innerRef = useRef<HTMLInputElement>(null);
+  const inputRef = ref || innerRef;
+
+  useEffect(() => {
+    if (focusOnMount) {
+      (inputRef as React.RefObject<HTMLInputElement>).current?.focus();
+    } else if (document.activeElement === document.body) {
+      (inputRef as React.RefObject<HTMLInputElement>).current?.focus();
+    }
+  }, [focusOnMount, inputRef]);
+
+  // Maintain focus unless another input is selected
+  const handleBlur = (e: React.FocusEvent) => {
+    // Check if the new active element is an input/textarea
+    const newTarget = e.relatedTarget as HTMLElement;
+    if (!newTarget?.matches('input, textarea')) {
+      // If not focusing another input, maintain focus
+      requestAnimationFrame(() => {
+        (inputRef as React.RefObject<HTMLInputElement>).current?.focus();
+      });
+    }
+  };
 
   const handleSend = () => {
     if (text.trim()) {
@@ -51,9 +75,11 @@ export const ChatInput: FC<ChatInputProps> = ({
       )}
       <div className="relative flex items-center">
         <input
+          ref={inputRef}
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onBlur={handleBlur}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
@@ -61,7 +87,7 @@ export const ChatInput: FC<ChatInputProps> = ({
             }
           }}
           placeholder={placeholder}
-          className="w-full bg-gray-800 text-white rounded px-4 py-2 pr-10"
+          className="w-full bg-gray-800 text-white rounded px-4 py-2 pr-10 focus:outline-none"
           disabled={isLoading}
         />
         <div className="absolute right-2">
@@ -87,4 +113,4 @@ export const ChatInput: FC<ChatInputProps> = ({
       </div>
     </div>
   );
-}; 
+}); 

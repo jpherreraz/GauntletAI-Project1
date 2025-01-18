@@ -1,4 +1,5 @@
 {
   "/api/messages/route": "app/api/messages/route.js",
+  "/api/dm-list/route": "app/api/dm-list/route.js",
   "/(auth)/channels/global/[channelId]/page": "app/(auth)/channels/global/[channelId]/page.js"
 }
