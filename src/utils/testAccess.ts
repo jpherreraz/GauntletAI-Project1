@@ -1,15 +1,26 @@
 import { AppSyncClient, ListGraphqlApisCommand } from "@aws-sdk/client-appsync";
 import { DynamoDBClient, ListTablesCommand } from "@aws-sdk/client-dynamodb";
+import * as dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
+
+if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION) {
+  throw new Error('Missing required AWS environment variables');
+}
+
+const region = process.env.AWS_REGION;
+const credentials = {
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+};
 
 async function testAccess() {
   try {
     // Test AppSync access
     const appSyncClient = new AppSyncClient({ 
-      region: 'us-east-2',  // Replace with your region
-      credentials: {
-        accessKeyId: 'AKIAW5BDQ6ZZ3EIKJYUI',  // Replace with your access key
-        secretAccessKey: 'c2bOGkLE9ezXvtKxJmwxjxGqbXzODqrrCchY5954'  // Replace with your secret key
-      }
+      region,
+      credentials
     });
     await appSyncClient.send(new ListGraphqlApisCommand({}));
     console.log('AppSync access: ✅');
@@ -21,11 +32,8 @@ async function testAccess() {
   try {
     // Test DynamoDB access
     const dynamoClient = new DynamoDBClient({ 
-      region: 'us-east-2',  // Replace with your region
-      credentials: {
-        accessKeyId: 'AKIAW5BDQ6ZZ3EIKJYUI',  // Replace with your access key
-        secretAccessKey: 'c2bOGkLE9ezXvtKxJmwxjxGqbXzODqrrCchY5954'  // Replace with your secret key
-      }
+      region,
+      credentials
     });
     await dynamoClient.send(new ListTablesCommand({}));
     console.log('DynamoDB access: ✅');
@@ -35,4 +43,4 @@ async function testAccess() {
   }
 }
 
-testAccess(); 
+export default testAccess; 

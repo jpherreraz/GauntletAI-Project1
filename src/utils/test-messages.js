@@ -1,18 +1,26 @@
 import { DynamoDBClient, ScanCommand } from "@aws-sdk/client-dynamodb";
 import { unmarshall } from "@aws-sdk/util-dynamodb";
+import * as dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
+
+if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION) {
+  throw new Error('Missing required AWS environment variables');
+}
 
 const dynamoClient = new DynamoDBClient({
-  region: 'us-east-2',  // Replace with your region
+  region: process.env.AWS_REGION,
   credentials: {
-    accessKeyId: 'AKIAW5BDQ6ZZ3EIKJYUI',
-    secretAccessKey: 'c2bOGkLE9ezXvtKxJmwxjxGqbXzODqrrCchY5954'
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
   }
 });
 
 async function listMessages() {
   try {
     const { Items = [] } = await dynamoClient.send(new ScanCommand({
-      TableName: 'Messages'
+      TableName: process.env.DYNAMODB_TABLE_MESSAGES || 'Messages'
     }));
     
     console.log('Messages in table:');

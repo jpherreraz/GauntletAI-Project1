@@ -39,7 +39,20 @@ const nextConfig = {
         ],
       },
     ];
-  }
+  },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = [
+        ...(config.externals || []),
+        '@aws-sdk/client-dynamodb',
+        '@aws-sdk/client-appsync',
+        '@aws-sdk/client-s3',
+        '@aws-sdk/s3-request-presigner',
+        '@aws-sdk/util-dynamodb'
+      ];
+    }
+    return config;
+  },
 };
 
 module.exports = nextConfig; 
