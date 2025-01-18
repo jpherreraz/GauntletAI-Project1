@@ -15,7 +15,7 @@ interface ConversationHeaderProps {
 export function ConversationHeader({ recipientId }: ConversationHeaderProps) {
   const [recipientName, setRecipientName] = useState('User');
   const [recipientImage, setRecipientImage] = useState('');
-  const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   useEffect(() => {
     const fetchRecipientInfo = async () => {

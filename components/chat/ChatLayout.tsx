@@ -8,7 +8,7 @@ import { ChatMessages } from './ChatMessages';
 import { ThreadView } from './ThreadView';
 import { ChatHeader } from './ChatHeader';
 import { messageService } from '@/src/services/messageService';
-import { useUser } from '@clerk/nextjs';
+import { useUser, useAuth } from '@clerk/nextjs';
 
 interface ChatLayoutProps {
   messages: MessageType[];
@@ -39,6 +39,7 @@ export default function ChatLayout({
   const { activeThread, setActiveThread } = useThread();
   const [newMessageSent, setNewMessageSent] = useState(false);
   const { user } = useUser();
+  const { getToken } = useAuth();
   const mainInputRef = useRef<HTMLInputElement>(null);
 
   // Close thread view when channel changes
@@ -117,11 +118,13 @@ export default function ChatLayout({
             onReactionSelect={async (messageId: string, emoji: string) => {
               if (!user?.id) return;
               try {
+                const token = await getToken();
                 await messageService.toggleReaction({
                   messageId,
                   emoji,
                   userId: user.id,
-                  channelId
+                  channelId,
+                  token
                 });
                 const updatedMessages = messages.map(msg => {
                   if (msg.id === messageId) {

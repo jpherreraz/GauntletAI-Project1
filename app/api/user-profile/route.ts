@@ -4,15 +4,15 @@ import { DynamoDBClient, GetItemCommand, PutItemCommand } from "@aws-sdk/client-
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
 import { clerkClient } from "@clerk/nextjs/server";
 
-// Validate environment variables
-const TABLE_NAME = process.env.DYNAMODB_TABLE_USER_PROFILES;
-const dynamoClient: DynamoDBClient | undefined = TABLE_NAME ? new DynamoDBClient({
-  region: 'us-east-2',
+const dynamoClient = new DynamoDBClient({
+  region: "us-east-2",
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!
-  }
-}) : undefined;
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+});
+
+const TABLE_NAME = process.env.DYNAMODB_TABLE_USER_PROFILES || "user-profiles";
 
 const BOT_PROFILE = {
   userId: 'chatgenius-bot',
