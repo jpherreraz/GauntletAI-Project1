@@ -40,11 +40,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const { ref: bottomRef, inView: isBottomVisible } = useInView({
     threshold: 0.1,
     root: parentRef.current,
-    rootMargin: '50px',
+    rootMargin: '0px',
     onChange: (inView) => {
-      if (inView) {
+      if (inView && isAtBottom) {
         setUnreadCount(0);
-        setIsAtBottom(true);
       }
     }
   });
@@ -55,20 +54,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     const element = parentRef.current;
     const maxScroll = element.scrollHeight - element.clientHeight;
     const currentScroll = element.scrollTop;
-    const scrolledToBottom = maxScroll - currentScroll < 50;
+    // Make the bottom detection more precise
+    const scrolledToBottom = maxScroll - currentScroll < 10;
     
     lastScrollTopRef.current = currentScroll;
-    
-    console.log('Scroll debug:', {
-      maxScroll,
-      currentScroll,
-      scrolledToBottom,
-      isBottomVisible,
-      scrollHeight: element.scrollHeight,
-      clientHeight: element.clientHeight,
-      difference: maxScroll - currentScroll,
-      unreadCount
-    });
 
     if (scrolledToBottom) {
       setIsAtBottom(true);
@@ -76,7 +65,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     } else {
       setIsAtBottom(false);
     }
-  }, [isBottomVisible]);
+  }, []);
 
   // Scroll to bottom
   const scrollToBottom = useCallback(() => {
@@ -104,21 +93,28 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     if (messages.length > lastMessageCountRef.current) {
       const newMessageCount = messages.length - lastMessageCountRef.current;
       
-      if (newMessageSent || isAtBottom || isBottomVisible) {
-        // Scroll to bottom when sending a message or when already at bottom
+      // Only scroll if it's our own message
+      if (newMessageSent) {
         setTimeout(() => {
           requestAnimationFrame(() => {
             scrollToBottom();
           });
         }, 100);
-      } else {
+      } else if (!isAtBottom) {
         // Update unread count for messages from others when not at bottom
         setUnreadCount(prev => prev + newMessageCount);
+      } else {
+        // We're at the bottom, so scroll to new messages
+        setTimeout(() => {
+          requestAnimationFrame(() => {
+            scrollToBottom();
+          });
+        }, 100);
       }
 
       lastMessageCountRef.current = messages.length;
     }
-  }, [messages.length, isAtBottom, isBottomVisible, newMessageSent, scrollToBottom]);
+  }, [messages.length, isAtBottom, newMessageSent, scrollToBottom]);
 
   // Add scroll event listener and initial position
   useEffect(() => {
@@ -161,7 +157,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
   // Clear unread count when bottom becomes visible
   useEffect(() => {
-    if (isBottomVisible || isAtBottom) {
+    if (isBottomVisible && isAtBottom) {
       setUnreadCount(0);
     }
   }, [isBottomVisible, isAtBottom]);

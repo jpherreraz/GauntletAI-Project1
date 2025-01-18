@@ -1,19 +1,4 @@
 {
   "/api/messages/route": "app/api/messages/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/(auth)/channels/global/[channelId]/page": "app/(auth)/channels/global/[channelId]/page.js",
-  "/api/delete-user/route": "app/api/delete-user/route.js",
-  "/api/dm-list/add/route": "app/api/dm-list/add/route.js",
-  "/api/dm-list/remove/route": "app/api/dm-list/remove/route.js",
-  "/api/dm-list/route": "app/api/dm-list/route.js",
-  "/api/messages/reaction/route": "app/api/messages/reaction/route.js",
-  "/api/upload/route": "app/api/upload/route.js",
-  "/api/user-profile/route": "app/api/user-profile/route.js",
-  "/page": "app/page.js",
-  "/(main)/channels/[channelId]/page": "app/(main)/channels/[channelId]/page.js",
-  "/(public)/sign-in/[[...sign-in]]/page": "app/(public)/sign-in/[[...sign-in]]/page.js",
-  "/(public)/sign-up/[[...sign-up]]/page": "app/(public)/sign-up/[[...sign-up]]/page.js",
-  "/(auth)/channels/me/page": "app/(auth)/channels/me/page.js",
-  "/(auth)/explore/[view]/page": "app/(auth)/explore/[view]/page.js",
-  "/(auth)/channels/me/[userId]/page": "app/(auth)/channels/me/[userId]/page.js"
+  "/(auth)/channels/global/[channelId]/page": "app/(auth)/channels/global/[channelId]/page.js"
 }
