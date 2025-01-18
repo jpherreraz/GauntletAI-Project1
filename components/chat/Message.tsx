@@ -1,4 +1,4 @@
-import { FC, useCallback } from 'react';
+import { FC, useCallback, useState } from 'react';
 import { Message as MessageType } from '@/src/types/message';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Reply, MessageSquare, SmilePlus } from 'lucide-react';
@@ -8,6 +8,8 @@ import { EmojiPicker } from '@/components/EmojiPicker';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { formatMessageTime } from '@/lib/utils';
+import { UserProfileCard } from '@/components/UserProfileCard';
+import { UserProfile } from '@/src/services/userService';
 
 interface MessageProps {
   message: MessageType;
@@ -33,6 +35,8 @@ export const Message: FC<MessageProps> = ({
   onViewThread
 }) => {
   const { colorScheme } = useTheme();
+  const [showProfile, setShowProfile] = useState(false);
+
   const shouldChainMessage = (current: MessageType, prev?: MessageType) => {
     if (!prev) return false;
     const timeDiff = current.timestamp - prev.timestamp;
@@ -68,6 +72,19 @@ export const Message: FC<MessageProps> = ({
     );
   };
 
+  const handleProfileClick = () => {
+    setShowProfile(true);
+  };
+
+  const userProfile: UserProfile = {
+    userId: message.userId,
+    fullName: message.fullName,
+    username: message.username,
+    imageUrl: message.imageUrl,
+    status: message.status,
+    bio: message.bio
+  };
+
   return (
     <div className={cn(
       "relative",
@@ -76,7 +93,7 @@ export const Message: FC<MessageProps> = ({
     )}>
       <div className="flex items-start gap-3 group">
         {!isChained && (
-          <Avatar className="h-8 w-8">
+          <Avatar className="h-8 w-8 cursor-pointer hover:opacity-80" onClick={handleProfileClick}>
             <AvatarImage src={message.imageUrl} alt={message.fullName} />
             <AvatarFallback>
               {message.fullName.split(' ').map(n => n[0]).join('').toUpperCase()}
@@ -86,7 +103,12 @@ export const Message: FC<MessageProps> = ({
         <div className={`flex-1 ${isChained ? 'ml-11' : ''}`}>
           {!isChained && (
             <div className="flex items-baseline">
-              <span className="text-white font-medium">{message.fullName}</span>
+              <span 
+                className="text-white font-medium cursor-pointer hover:underline" 
+                onClick={handleProfileClick}
+              >
+                {message.fullName}
+              </span>
               <span className="ml-2 text-xs text-gray-400">
                 {formatMessageTime(message.timestamp)}
               </span>
@@ -165,6 +187,11 @@ export const Message: FC<MessageProps> = ({
           </div>
         </div>
       </div>
+      <UserProfileCard
+        isOpen={showProfile}
+        onClose={() => setShowProfile(false)}
+        user={userProfile}
+      />
     </div>
   );
 }; 

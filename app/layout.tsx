@@ -22,7 +22,9 @@ export const metadata = {
 // Client component wrapper for providers
 function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider>
+    <ClerkProvider 
+      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+    >
       <ThemeProvider>
         <SettingsProvider>
           {children}

@@ -77,11 +77,6 @@ export function Sidebar({
   ])
   const [status, setStatus] = useState<Status>('online')
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
-  const [localDmUsers, setLocalDmUsers] = useState(dmUsers)
-
-  useEffect(() => {
-    setLocalDmUsers(dmUsers)
-  }, [dmUsers])
 
   const handleStatusChange = useCallback((newStatus: string) => {
     setStatus(newStatus as Status)
@@ -109,11 +104,8 @@ export function Sidebar({
 
   const handleDeleteDM = async (userId: string) => {
     try {
-      // Update local state immediately
-      const updatedUsers = localDmUsers.filter(dmUser => dmUser.userId !== userId)
-      setLocalDmUsers(updatedUsers)
-      
       // Update parent state immediately
+      const updatedUsers = dmUsers.filter(dmUser => dmUser.userId !== userId)
       onDMListChange?.(updatedUsers)
 
       // Redirect if we're in the deleted DM's channel
@@ -127,8 +119,7 @@ export function Sidebar({
       })
 
       if (!response.ok) {
-        // Revert both local and parent state if API call fails
-        setLocalDmUsers(dmUsers)
+        // Revert parent state if API call fails
         onDMListChange?.(dmUsers)
         throw new Error('Failed to remove DM')
       }
@@ -242,36 +233,37 @@ export function Sidebar({
               Direct Messages
             </h3>
             <div className="space-y-1">
-              {localDmUsers.map((dmUser) => (
-                <div
-                  key={dmUser.userId}
-                  className="group relative flex items-center px-2 py-1.5 rounded-md hover:bg-accent/50"
-                >
-                  <Link
-                    href={`/channels/me/${dmUser.userId}`}
+              {dmUsers.map((dmUser) => (
+                <div key={dmUser.userId} className="mb-1">
+                  <div
                     className={cn(
-                      "flex items-center gap-2 flex-1 min-w-0",
-                      pathname === `/channels/me/${dmUser.userId}` && "bg-accent"
+                      "flex items-center w-full p-2 rounded-md cursor-pointer group",
+                      pathname === `/channels/me/${dmUser.userId}`
+                        ? cn(`bg-${colorScheme}-600`, "bg-opacity-30", `text-${colorScheme}-50`)
+                        : cn(`hover:bg-${colorScheme}-700`, "hover:bg-opacity-15", `text-${colorScheme}-50 text-opacity-90`)
                     )}
+                    onClick={() => router.push(`/channels/me/${dmUser.userId}`)}
                   >
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={dmUser.imageUrl} />
-                      <AvatarFallback>{dmUser.fullName?.[0] || dmUser.username?.[0]}</AvatarFallback>
-                    </Avatar>
-                    <span className="truncate">{dmUser.fullName || dmUser.username}</span>
-                  </Link>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      handleDeleteDM(dmUser.userId)
-                    }}
-                    className="opacity-0 group-hover:opacity-100 h-6 w-6 p-0 ml-2 hover:bg-red-500/20 hover:text-red-400"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={dmUser.imageUrl} />
+                        <AvatarFallback>{dmUser.fullName?.[0] || dmUser.username?.[0]}</AvatarFallback>
+                      </Avatar>
+                      <span className="truncate">{dmUser.fullName || dmUser.username}</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        handleDeleteDM(dmUser.userId)
+                      }}
+                      className="opacity-0 group-hover:opacity-100 h-6 w-6 p-0 ml-2 hover:bg-red-500/20 hover:text-red-400"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

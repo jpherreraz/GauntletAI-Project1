@@ -2,7 +2,7 @@
 
 import { useThread } from '@/contexts/ThreadContext';
 import { Message as MessageType } from '@/src/types/message';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { ChatInput } from './ChatInput';
 import { ChatMessages } from './ChatMessages';
 import { ThreadView } from './ThreadView';
@@ -13,23 +13,27 @@ import { useUser } from '@clerk/nextjs';
 interface ChatLayoutProps {
   messages: MessageType[];
   loading: boolean;
+  error?: string | null;
   onSendMessage: (text: string, parentId?: string) => void;
   channelId: string;
   setMessages: React.Dispatch<React.SetStateAction<MessageType[]>>;
   isDM?: boolean;
   recipientName?: string;
   recipientId?: string;
+  recipientImage?: string;
 }
 
 export default function ChatLayout({ 
   messages, 
   loading, 
+  error,
   onSendMessage,
   channelId,
   setMessages,
   isDM = false,
   recipientName,
-  recipientId
+  recipientId,
+  recipientImage
 }: ChatLayoutProps) {
   const renderCount = useRef(0);
   const { activeThread, setActiveThread } = useThread();
@@ -44,45 +48,29 @@ export default function ChatLayout({
     }
   }, [channelId]);
 
-  // Log initial mount and cleanup
+  // Log initial mount and cleanup only in development
   useEffect(() => {
-    console.log('ChatLayout: mounted with thread context:', {
-      hasActiveThread: !!activeThread,
-      threadId: activeThread?.id,
-      messageCount: messages.length
-    });
-    return () => console.log('ChatLayout: unmounting');
+    if (process.env.NODE_ENV === 'development') {
+      // Remove console logs
+    }
   }, []);
 
-  // Log every render
+  // Only log thread state changes in development
   useEffect(() => {
-    renderCount.current++;
-    console.log('ChatLayout: rendering', {
-      renderCount: renderCount.current,
-      hasActiveThread: !!activeThread,
-      threadId: activeThread?.id,
-      messageCount: messages.length
-    });
-  });
-
-  // Log thread state changes
-  useEffect(() => {
-    console.log('ChatLayout: thread state changed:', {
-      hasActiveThread: !!activeThread,
-      threadId: activeThread?.id,
-      messageText: activeThread?.text?.slice(0, 50),
-      threadObject: activeThread ? JSON.stringify(activeThread) : 'null'
-    });
+    if (process.env.NODE_ENV === 'development') {
+      // Remove console logs
+    }
   }, [activeThread]);
 
-  const replies = activeThread ? messages.filter(msg => msg.replyToId === activeThread.id) : [];
-  console.log('ChatLayout: filtered replies:', {
-    threadId: activeThread?.id,
-    replyCount: replies.length,
-    hasActiveThread: !!activeThread,
-    mainDivWidth: activeThread ? "w-[calc(100%-400px)]" : "w-full",
-    shouldShowThreadView: !!activeThread
-  });
+  const replies = useMemo(() => 
+    activeThread ? messages.filter(msg => msg.replyToId === activeThread.id) : [],
+    [activeThread, messages]
+  );
+
+  // Only log filtered replies in development
+  if (process.env.NODE_ENV === 'development') {
+    // Remove console logs
+  }
 
   return (
     <div className="absolute inset-0 flex">
@@ -93,6 +81,7 @@ export default function ChatLayout({
             isDM={isDM}
             recipientName={recipientName}
             recipientId={recipientId}
+            recipientImage={recipientImage}
           />
           <ChatMessages
             messages={messages}

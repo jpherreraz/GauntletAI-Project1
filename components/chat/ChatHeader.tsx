@@ -6,22 +6,34 @@ interface ChatHeaderProps {
   isDM?: boolean;
   recipientName?: string;
   recipientId?: string;
+  recipientImage?: string;
 }
+
+const CHATGENIUS_BOT = {
+  name: 'ChatGenius Bot',
+  imageUrl: '/favicon.ico'
+};
 
 export const ChatHeader: FC<ChatHeaderProps> = ({ 
   channel, 
   isDM = false, 
   recipientName = 'User',
-  recipientId 
+  recipientId,
+  recipientImage
 }) => {
   if (isDM) {
+    const isBot = recipientId === 'chatgenius-bot';
+    const displayName = isBot ? CHATGENIUS_BOT.name : recipientName;
+    const avatarUrl = isBot ? CHATGENIUS_BOT.imageUrl : recipientImage;
+    const initial = displayName[0]?.toUpperCase() || '?';
+
     return (
       <div className="flex items-center p-4 border-b border-gray-800 bg-gray-900">
         <Avatar className="h-8 w-8 mr-2">
-          <AvatarImage src="" />
-          <AvatarFallback>{recipientName[0]?.toUpperCase()}</AvatarFallback>
+          <AvatarImage src={avatarUrl} alt={displayName} />
+          <AvatarFallback>{initial}</AvatarFallback>
         </Avatar>
-        <span className="font-semibold text-gray-100">{recipientName}</span>
+        <span className="font-semibold text-gray-100">{displayName}</span>
       </div>
     );
   }

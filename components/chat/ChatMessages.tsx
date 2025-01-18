@@ -1,7 +1,7 @@
 import { FC, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Message as MessageType } from '@/src/types/message';
 import { Message } from './Message';
-import { useUser } from '@clerk/nextjs';
+import { useUser, useAuth } from '@clerk/nextjs';
 import { messageService } from '@/src/services/messageService';
 import { formatDate } from '@/lib/utils';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -26,6 +26,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   channelId
 }) => {
   const { user } = useUser();
+  const { getToken } = useAuth();
   const { setActiveThread } = useThread();
   const parentRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -164,7 +165,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
   // Group messages by date - memoized
   const groupedMessages = useMemo(() => {
-    console.log('ChatMessages: grouping messages, length:', messages.length);
     const groups: { date: string; messages: MessageType[] }[] = [];
     let currentDate = '';
     let currentGroup: MessageType[] = [];
@@ -231,11 +231,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }));
 
     try {
+      const token = await getToken();
       await messageService.toggleReaction({
         messageId,
         emoji,
         userId: user.id,
-        channelId
+        channelId,
+        token
       });
     } catch (error) {
       console.error('Error toggling reaction:', error);
@@ -245,13 +247,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
   // Create a single stable handler for thread viewing
   const handleViewThread = useCallback((message: MessageType) => {
-    console.log('ChatMessages: handleViewThread called with:', {
-      messageId: message.id,
-      hasSetActiveThread: typeof setActiveThread === 'function'
-    });
-
     if (typeof setActiveThread === 'function') {
-      console.log('ChatMessages: setting active thread');
       setActiveThread(message);
     } else {
       console.warn('ChatMessages: setActiveThread is not available');
@@ -260,9 +256,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
   // Log when component mounts
   useEffect(() => {
-    console.log('ChatMessages: mounted with thread context:', {
-      hasSetActiveThread: typeof setActiveThread === 'function'
-    });
+    // Remove console logs
   }, [setActiveThread]);
 
   // Memoize the message renderer with stable dependencies
@@ -271,7 +265,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     
     return (
       <Message
-        key={message.id}
+        key={`${message.id}-${index}`}
         message={message}
         onReplyClick={onReplyClick}
         hasReplies={replies.length > 0}

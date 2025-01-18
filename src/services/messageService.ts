@@ -1,87 +1,131 @@
 import { Message } from "@/src/types/message";
+import { UserStatus } from '@/src/services/userService';
+import { dmListService } from './dmListService';
 
-export const messageService = {
-  async getMessages(channelId: string): Promise<Message[]> {
-    try {
-      const response = await fetch(`/api/messages?channelId=${channelId}`, {
-        method: 'GET',
+interface SendMessageParams {
+  channelId: string;
+  text: string;
+  fullName: string;
+  userId: string;
+  imageUrl?: string;
+  username?: string;
+  status?: UserStatus;
+  bio?: string;
+  replyToId?: string;
+  replyTo?: {
+    id: string;
+    text: string;
+    fullName: string;
+  };
+  token: string | null;
+}
+
+async function fetchWithCredentials(url: string, token: string | null, options: RequestInit = {}, retryCount = 0): Promise<Response> {
+  const headers: HeadersInit = {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      credentials: 'include',
+      headers: {
+        ...headers,
+        ...options.headers
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData,
+        url,
+        method: options.method || 'GET',
+        retryCount
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to get messages');
+      // If we get a 401 or 500 and haven't retried too many times, wait and retry
+      if ((response.status === 401 || response.status === 500) && retryCount < 2) {
+        console.log(`Request failed with ${response.status}, retrying after delay...`);
+        await new Promise(resolve => setTimeout(resolve, 200 * (retryCount + 1)));
+        return fetchWithCredentials(url, token, options, retryCount + 1);
       }
 
+      throw new Error(errorData.details || errorData.error || `API request failed: ${response.status} ${response.statusText}`);
+    }
+
+    return response;
+  } catch (error) {
+    console.error('Fetch error:', {
+      error,
+      url,
+      method: options.method || 'GET',
+      retryCount
+    });
+    throw error;
+  }
+}
+
+export const messageService = {
+  async getMessages(channelId: string, token: string | null): Promise<Message[]> {
+    try {
+      const response = await fetchWithCredentials(`/api/messages?channelId=${channelId}`, token);
+      if (!response.ok) {
+        throw new Error('Failed to fetch messages');
+      }
       return await response.json();
     } catch (error) {
-      console.error('Error getting messages:', error);
+      console.error('Error fetching messages:', error);
       throw error;
     }
   },
 
-  async sendMessage({ 
-    channelId, 
-    text,
-    fullName,
-    userId,
-    imageUrl,
-    replyToId,
-    replyTo
-  }: { 
-    channelId: string; 
-    text: string;
-    fullName: string;
-    userId: string;
-    imageUrl?: string;
-    replyToId?: string;
-    replyTo?: {
-      id: string;
-      text: string;
-      fullName: string;
-    };
-  }): Promise<Message> {
+  async sendMessage(params: SendMessageParams): Promise<Message> {
     try {
-      console.log('Sending message:', { channelId, text, fullName, userId, imageUrl, replyToId, replyTo }); // Debug log
-
-      const response = await fetch('/api/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          channelId,
-          text,
-          fullName,
-          userId,
-          imageUrl,
-          replyToId,
-          replyTo
-        }),
+      console.log('Sending message:', {
+        channelId: params.channelId,
+        text: params.text,
+        fullName: params.fullName,
+        userId: params.userId
       });
 
-      const data = await response.json();
-      console.log('Response from server:', data); // Debug log
+      const response = await fetchWithCredentials('/api/messages', params.token, {
+        method: 'POST',
+        body: JSON.stringify(params)
+      });
 
       if (!response.ok) {
-        console.error('Server error:', data); // Debug log
-        throw new Error(data.error || 'Failed to send message');
+        throw new Error('Failed to send message');
+      }
+
+      const data = await response.json();
+      console.log('Message sent successfully:', data);
+
+      // Extract the DM user ID from the channel ID
+      const dmMatch = params.channelId.match(/^dm-(.+)-(.+)$/);
+      if (dmMatch) {
+        const [_, user1, user2] = dmMatch;
+        const dmUserId = user1 === params.userId ? user2 : user1;
+        await dmListService.updateLastMessageTime(params.userId, dmUserId);
       }
 
       return data;
     } catch (error) {
       console.error('Error sending message:', error);
-      console.error('Error details:', {
-        name: error instanceof Error ? error.name : 'Unknown',
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
-      });
       throw error;
     }
   },
 
-  async clearMessages(): Promise<void> {
+  async clearMessages(token: string | null): Promise<void> {
     try {
-      const response = await fetch('/api/messages', {
+      const response = await fetchWithCredentials('/api/messages', token, {
         method: 'DELETE'
       });
 
@@ -99,21 +143,18 @@ export const messageService = {
     messageId, 
     emoji, 
     userId,
-    channelId 
+    channelId,
+    token 
   }: { 
     messageId: string; 
     emoji: string; 
     userId: string;
     channelId: string;
+    token: string | null;
   }): Promise<boolean> {
     try {
-      console.log('Sending reaction:', { messageId, emoji, userId, channelId }); // Debug log
-
-      const response = await fetch('/api/messages/reaction', {
+      const response = await fetchWithCredentials('/api/messages/reaction', token, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           messageId,
           emoji,
@@ -125,7 +166,6 @@ export const messageService = {
       const data = await response.json();
       
       if (!response.ok) {
-        console.error('Reaction API error:', data); // Debug log
         throw new Error(data.error || 'Failed to toggle reaction');
       }
 
@@ -136,11 +176,9 @@ export const messageService = {
     }
   },
 
-  async getMessagesSince(channelId: string, timestamp: number): Promise<Message[]> {
+  async getMessagesSince(channelId: string, timestamp: number, token: string | null): Promise<Message[]> {
     try {
-      const response = await fetch(`/api/messages?channelId=${channelId}&since=${timestamp}`, {
-        method: 'GET'
-      });
+      const response = await fetchWithCredentials(`/api/messages?channelId=${channelId}&since=${timestamp}`, token);
 
       if (!response.ok) {
         const error = await response.json();

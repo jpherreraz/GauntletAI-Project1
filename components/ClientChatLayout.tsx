@@ -29,12 +29,17 @@ export function ClientChatLayout({
   const [dmUsers, setDmUsers] = useState<UserProfile[]>([])
   const [selectedDMUser, setSelectedDMUser] = useState<UserProfile | null>(null)
   const [selectedDMUserId, setSelectedDMUserId] = useState<string | null>(null)
+  const [lastViewedDMUserId, setLastViewedDMUserId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!pathname) return;
     
     if (pathname.startsWith('/channels/me')) {
       setViewMode('dms');
+      const userId = pathname.split('/').pop();
+      if (userId && userId !== 'me') {
+        setLastViewedDMUserId(userId);
+      }
     } else if (pathname.startsWith('/channels/global/')) {
       setViewMode('channels');
       const channelId = pathname.split('/').pop();
@@ -50,48 +55,48 @@ export function ClientChatLayout({
     if (!user?.id) return;
 
     const loadDMList = async () => {
-      const savedDMUsers = await dmListService.getDMList(user.id);
-      if (savedDMUsers.length > 0) {
+      try {
+        const savedDMUsers = await dmListService.getDMList(user.id);
         setDmUsers(savedDMUsers);
+      } catch (error) {
+        console.error('Error loading DM list:', error);
       }
     };
 
+    // Initial load
     loadDMList();
+
+    // Poll for updates more frequently (every 2 seconds)
+    const interval = setInterval(loadDMList, 2000);
+
+    return () => clearInterval(interval);
   }, [user?.id]);
 
   useEffect(() => {
-    if (!user?.id || dmUsers.length === 0) return;
-
-    const saveDMList = async () => {
-      try {
-        const success = await dmListService.saveDMList(user.id, dmUsers);
-        if (!success) {
-          console.error('Failed to save DM list');
+    const handleDMStart = async (event: Event) => {
+      const customEvent = event as CustomEvent<UserProfile>;
+      const userInfo = customEvent.detail;
+      if (user?.id) {
+        try {
+          // Let the server handle the ordering
+          await dmListService.updateLastMessageTime(user.id, userInfo.userId);
+          
+          // Update UI state
+          setViewMode('dms');
+          setExploreView('none');
+          setSelectedDMUserId(userInfo.userId);
+          setLastViewedDMUserId(userInfo.userId);
+          router.push(`/channels/me/${userInfo.userId}`);
+          setSelectedDMUser(userInfo);
+        } catch (error) {
+          console.error('Error starting DM:', error);
         }
-      } catch (error) {
-        console.error('Error saving DM list:', error);
       }
     };
 
-    saveDMList();
-  }, [user?.id, dmUsers]);
-
-  useEffect(() => {
-    const handleDMStart = (event: CustomEvent<UserProfile>) => {
-      const userInfo = event.detail;
-      setDmUsers(prev => {
-        if (!prev.find(u => u.userId === userInfo.userId)) {
-          return [...prev, userInfo];
-        }
-        return prev;
-      });
-      setSelectedDMUser(userInfo);
-      setSelectedDMUserId(userInfo.userId);
-    };
-
-    window.addEventListener('startDM', handleDMStart as EventListener);
-    return () => window.removeEventListener('startDM', handleDMStart as EventListener);
-  }, []);
+    window.addEventListener('startDM', handleDMStart);
+    return () => window.removeEventListener('startDM', handleDMStart);
+  }, [user?.id]);
 
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
@@ -100,7 +105,21 @@ export function ClientChatLayout({
       router.push('/explore/servers');
     } else if (mode === 'dms') {
       setExploreView('none');
-      router.push('/channels/me');
+      // First try to open the last viewed DM
+      if (lastViewedDMUserId && dmUsers.some(user => user.userId === lastViewedDMUserId)) {
+        router.push(`/channels/me/${lastViewedDMUserId}`);
+        setSelectedDMUserId(lastViewedDMUserId);
+        setSelectedDMUser(dmUsers.find(user => user.userId === lastViewedDMUserId) || null);
+      } else if (dmUsers.length > 0) {
+        // Fall back to most recent DM if last viewed is not available
+        const mostRecentDM = dmUsers[0];
+        router.push(`/channels/me/${mostRecentDM.userId}`);
+        setSelectedDMUserId(mostRecentDM.userId);
+        setSelectedDMUser(mostRecentDM);
+        setLastViewedDMUserId(mostRecentDM.userId);
+      } else {
+        router.push('/channels/me');
+      }
     } else {
       setExploreView('none');
       router.push(`/channels/global/${currentChannel}`);
@@ -117,21 +136,20 @@ export function ClientChatLayout({
       const response = await fetch(`/api/user-profile?userId=${userId}`);
       const userInfo = await response.json();
       
-      if (userInfo) {
-        setDmUsers(prev => {
-          if (!prev.find(u => u.userId === userId)) {
-            return [...prev, userInfo];
-          }
-          return prev;
-        });
+      if (user?.id) {
+        // Update the DM list through the service
+        await dmListService.updateLastMessageTime(user.id, userId);
+        
+        // Update UI state
         setViewMode('dms');
         setExploreView('none');
         setSelectedDMUserId(userId);
+        setLastViewedDMUserId(userId);
         router.push(`/channels/me/${userId}`);
         setSelectedDMUser(userInfo);
       }
     } catch (error) {
-      console.error('Error fetching user info:', error);
+      console.error('Error starting DM:', error);
     }
   };
 

@@ -33,7 +33,10 @@ export function useMessages(channelId: string) {
         channelId,
         fullName: user.fullName || 'Unknown User',
         userId: user.id,
-        imageUrl: user.imageUrl || ''
+        imageUrl: user.imageUrl || '',
+        username: user.username || undefined,
+        status: (user.unsafeMetadata.status as Message['status']) || 'online',
+        bio: user.unsafeMetadata.bio as string || undefined
       });
       setMessages(prev => [...prev, newMessage]);
     } catch (error) {

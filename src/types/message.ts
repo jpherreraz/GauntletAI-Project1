@@ -6,6 +6,9 @@ export interface Message {
   timestamp: number;
   fullName: string;
   imageUrl?: string;
+  username?: string;
+  status?: 'online' | 'idle' | 'dnd' | 'invisible';
+  bio?: string;
   replyToId?: string;
   replyTo?: {
     id: string;

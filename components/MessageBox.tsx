@@ -1,106 +1,140 @@
-import { FC, useState, useEffect, useCallback } from 'react';
+import { FC, useState, useEffect, useCallback, useRef } from 'react';
 import { messageService } from '@/src/services/messageService';
 import { Message } from '@/src/types/message';
 import { ChatHeader } from './chat/ChatHeader';
 import ChatLayout from './chat/ChatLayout';
 import { useUser } from '@clerk/nextjs';
+import { dmListService } from '@/src/services/dmListService';
+import { SignInButton } from "@clerk/nextjs";
+import { useAuth } from '@clerk/nextjs';
 
 interface MessageBoxProps {
   channel: string;
   isDM?: boolean;
   recipientName?: string;
   recipientId?: string;
+  recipientImage?: string;
 }
 
 export const MessageBox: FC<MessageBoxProps> = ({ 
   channel, 
   isDM = false, 
   recipientName,
-  recipientId 
+  recipientId,
+  recipientImage
 }) => {
+  const { user, isLoaded, isSignedIn } = useUser();
+  const { getToken } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { user } = useUser();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const fetchMessages = useCallback(async () => {
     try {
-      const fetchedMessages = await messageService.getMessages(channel);
+      const token = await getToken();
+      const fetchedMessages = await messageService.getMessages(channel, token);
       setMessages(fetchedMessages);
+      setError(null);
     } catch (error) {
       console.error('Error fetching messages:', error);
+      setError('Failed to load messages');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }, [channel]);
+  }, [channel, getToken]);
 
   useEffect(() => {
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 3000);
-    return () => clearInterval(interval);
-  }, [fetchMessages]);
+    let mounted = true;
+    setLoading(true);
+    setMessages([]); // Reset messages when channel changes
+    setError(null);
+    
+    const initializeMessages = async () => {
+      if (!mounted) return;
+      await fetchMessages();
+      // Start polling after initial fetch
+      if (mounted) {
+        intervalRef.current = setInterval(fetchMessages, 5000);
+      }
+    };
 
-  const handleSendMessage = async (text: string, parentId?: string) => {
-    if (!user) return;
+    initializeMessages();
+
+    return () => {
+      mounted = false;
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [channel, fetchMessages]);
+
+  const handleSendMessage = async (text: string) => {
+    if (!isLoaded) {
+      setError('Loading user data...');
+      return;
+    }
+
+    if (!isSignedIn || !user) {
+      setError('Please sign in to send messages');
+      return;
+    }
 
     try {
-      // Optimistically add the message to the UI
-      const optimisticMessage = {
-        id: Date.now().toString(), // Temporary ID
-        text,
-        fullName: user.fullName || 'Anonymous',
-        userId: user.id,
-        channelId: channel,
-        timestamp: Date.now(),
-        replyToId: parentId,
-        replyTo: parentId ? {
-          id: parentId,
-          text: messages.find(m => m.id === parentId)?.text || '',
-          fullName: messages.find(m => m.id === parentId)?.fullName || ''
-        } : undefined
-      };
-      
-      setMessages(prev => [...prev, optimisticMessage]);
-
-      await messageService.sendMessage({
+      const token = await getToken();
+      const message = await messageService.sendMessage({
         channelId: channel,
         text,
-        fullName: user.fullName || 'Anonymous',
+        fullName: `${user.firstName} ${user.lastName}`,
         userId: user.id,
-        imageUrl: user.imageUrl || '',
-        replyToId: parentId,
-        replyTo: parentId ? {
-          id: parentId,
-          text: messages.find(m => m.id === parentId)?.text || '',
-          fullName: messages.find(m => m.id === parentId)?.fullName || ''
-        } : undefined
+        imageUrl: user.imageUrl,
+        username: user.username || undefined,
+        token
       });
 
-      // Quietly fetch the latest messages
-      const fetchedMessages = await messageService.getMessages(channel);
-      setMessages(fetchedMessages);
+      setMessages(prev => [...prev, message]);
+      scrollToBottom();
     } catch (error) {
       console.error('Error sending message:', error);
+      setError('Failed to send message');
     }
   };
 
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  if (!isLoaded) {
+    return <div className="flex items-center justify-center h-full">Loading...</div>;
+  }
+
+  if (!isSignedIn) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full space-y-4">
+        <p>Please sign in to view messages</p>
+        <SignInButton />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-full">
-      <ChatHeader 
-        channel={channel} 
-        isDM={isDM}
-        recipientName={recipientName}
-        recipientId={recipientId}
-      />
+    <div className="flex-1 flex flex-col h-full">
       <ChatLayout
         messages={messages}
-        loading={isLoading}
+        loading={loading}
+        error={error}
         onSendMessage={handleSendMessage}
         channelId={channel}
         setMessages={setMessages}
         isDM={isDM}
         recipientName={recipientName}
         recipientId={recipientId}
+        recipientImage={recipientImage}
       />
+      <div ref={messagesEndRef} />
     </div>
   );
 };

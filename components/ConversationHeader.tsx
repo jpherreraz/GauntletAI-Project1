@@ -1,8 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { userService } from '@/src/services/userService';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
+// Move cache outside component to persist between re-renders
+const profileCache: {[key: string]: {name: string, image: string, timestamp: number}} = {};
+const CACHE_DURATION = 60000; // Cache for 1 minute
 
 interface ConversationHeaderProps {
   recipientId: string;
@@ -11,23 +15,56 @@ interface ConversationHeaderProps {
 export function ConversationHeader({ recipientId }: ConversationHeaderProps) {
   const [recipientName, setRecipientName] = useState('User');
   const [recipientImage, setRecipientImage] = useState('');
+  const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     const fetchRecipientInfo = async () => {
       if (!recipientId) return;
 
+      // Check cache first
+      const cached = profileCache[recipientId];
+      const now = Date.now();
+      if (cached && (now - cached.timestamp < CACHE_DURATION)) {
+        setRecipientName(cached.name);
+        setRecipientImage(cached.image);
+        return;
+      }
+
       try {
         const profile = await userService.getUserProfile(recipientId);
         if (profile) {
-          setRecipientName(profile.username || profile.fullName || 'User');
-          setRecipientImage(profile.imageUrl || '');
+          const name = profile.username || profile.fullName || 'User';
+          const image = profile.imageUrl || '';
+          
+          setRecipientName(name);
+          setRecipientImage(image);
+          
+          // Update cache
+          profileCache[recipientId] = {
+            name,
+            image,
+            timestamp: now
+          };
         }
       } catch (error) {
         console.error('Error fetching recipient name:', error);
       }
     };
 
-    fetchRecipientInfo();
+    // Clear any existing timeout
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    // Set new timeout
+    fetchTimeoutRef.current = setTimeout(fetchRecipientInfo, 300);
+
+    // Cleanup function
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
   }, [recipientId]);
 
   return (

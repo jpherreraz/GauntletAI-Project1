@@ -7,13 +7,16 @@ export interface UserProfile {
   imageUrl?: string;
   status?: UserStatus;
   bio?: string;
+  lastMessageAt?: number;
 }
 
 export const userService = {
   async getUserProfile(userId: string): Promise<UserProfile | null> {
     try {
       console.log('Getting user profile for:', userId);
-      const response = await fetch(`/api/user-profile?userId=${userId}`);
+      const response = await fetch(`/api/user-profile?userId=${userId}`, {
+        credentials: 'include'
+      });
       
       if (!response.ok) {
         console.error('Error response:', {
@@ -29,7 +32,12 @@ export const userService = {
       console.log('Got user profile:', data);
       return {
         userId,
-        fullName: data?.fullName || 'Anonymous'
+        fullName: data?.fullName || 'Anonymous',
+        username: data?.username,
+        imageUrl: data?.imageUrl,
+        status: data?.status,
+        bio: data?.bio,
+        lastMessageAt: data?.lastMessageAt
       };
     } catch (error) {
       console.error('Error in getUserProfile:', {
@@ -48,6 +56,7 @@ export const userService = {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           userId,
           ...updates
@@ -68,7 +77,12 @@ export const userService = {
       console.log('Updated profile:', data);
       return {
         userId,
-        fullName: data?.fullName || 'Anonymous'
+        fullName: data?.fullName || 'Anonymous',
+        username: data?.username,
+        imageUrl: data?.imageUrl,
+        status: data?.status,
+        bio: data?.bio,
+        lastMessageAt: data?.lastMessageAt
       };
     } catch (error) {
       console.error('Error in updateUserProfile:', {

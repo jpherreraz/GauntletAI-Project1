@@ -14,11 +14,6 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
   const [activeThread, setActiveThread] = useState<MessageType | null>(null);
 
   const handleSetActiveThread = (message: MessageType | null) => {
-    console.log('ThreadContext: setting active thread:', {
-      messageId: message?.id,
-      messageText: message?.text?.slice(0, 50),
-      action: message ? 'opening' : 'closing'
-    });
     setActiveThread(message);
   };
 
@@ -26,8 +21,6 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
     activeThread,
     setActiveThread: handleSetActiveThread
   }), [activeThread]);
-
-  console.log('ThreadContext: rendering with active thread:', activeThread?.id);
 
   return (
     <ThreadContext.Provider value={value}>
@@ -39,7 +32,6 @@ export function ThreadProvider({ children }: { children: React.ReactNode }) {
 export function useThread() {
   const context = useContext(ThreadContext);
   if (context === undefined) {
-    console.error('useThread must be used within a ThreadProvider');
     throw new Error('useThread must be used within a ThreadProvider');
   }
   return context;
