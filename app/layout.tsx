@@ -1,5 +1,7 @@
 import { Inter } from 'next/font/google'
-import { Providers } from './providers'
+import { ClerkProvider } from '@clerk/nextjs'
+import { ThemeProvider } from '@/contexts/ThemeContext'
+import { SettingsProvider } from '@/contexts/SettingsContext'
 import '@/styles/globals.css'
 
 const inter = Inter({
@@ -17,6 +19,19 @@ export const metadata = {
   }
 }
 
+// Client component wrapper for providers
+function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <ClerkProvider>
+      <ThemeProvider>
+        <SettingsProvider>
+          {children}
+        </SettingsProvider>
+      </ThemeProvider>
+    </ClerkProvider>
+  );
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -30,5 +45,5 @@ export default function RootLayout({
         </Providers>
       </body>
     </html>
-  )
+  );
 }

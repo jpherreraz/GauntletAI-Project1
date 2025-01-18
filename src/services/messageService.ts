@@ -23,12 +23,16 @@ export const messageService = {
     channelId, 
     text,
     fullName,
+    userId,
+    imageUrl,
     replyToId,
     replyTo
   }: { 
     channelId: string; 
     text: string;
     fullName: string;
+    userId: string;
+    imageUrl?: string;
     replyToId?: string;
     replyTo?: {
       id: string;
@@ -37,7 +41,7 @@ export const messageService = {
     };
   }): Promise<Message> {
     try {
-      console.log('Sending message:', { channelId, text, fullName, replyToId, replyTo }); // Debug log
+      console.log('Sending message:', { channelId, text, fullName, userId, imageUrl, replyToId, replyTo }); // Debug log
 
       const response = await fetch('/api/messages', {
         method: 'POST',
@@ -48,6 +52,8 @@ export const messageService = {
           channelId,
           text,
           fullName,
+          userId,
+          imageUrl,
           replyToId,
           replyTo
         }),
