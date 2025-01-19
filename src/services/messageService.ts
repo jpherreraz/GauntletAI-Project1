@@ -107,15 +107,6 @@ export const messageService = {
 
       const data = await response.json();
       console.log('Message sent successfully:', data);
-
-      // Extract the DM user ID from the channel ID
-      const dmMatch = params.channelId.match(/^dm-(.+)-(.+)$/);
-      if (dmMatch) {
-        const [_, user1, user2] = dmMatch;
-        const dmUserId = user1 === params.userId ? user2 : user1;
-        await dmListService.updateLastMessageTime(params.userId, dmUserId);
-      }
-
       return data;
     } catch (error) {
       console.error('Error sending message:', error);

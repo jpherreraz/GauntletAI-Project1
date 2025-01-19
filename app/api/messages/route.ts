@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { createClerkClient } from "@clerk/backend";
-import { DynamoDBClient, PutItemCommand, QueryCommand, DeleteItemCommand, ScanCommand } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, PutItemCommand, QueryCommand, DeleteItemCommand, ScanCommand, GetItemCommand } from "@aws-sdk/client-dynamodb";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
 import { v4 as uuidv4 } from 'uuid';
 import { dmListService } from '@/src/services/dmListService';
@@ -201,6 +201,67 @@ export async function GET(request: NextRequest) {
           }
         }
 
+        // If this is a DM and we have new messages, update the DM list
+        if (channelId.startsWith('dm-') && messages.length > 0) {
+          const [user1Id, user2Id] = channelId.replace('dm-', '').split('-').sort();
+          const otherUserId = user1Id === userId ? user2Id : user1Id;
+          const latestMessage = messages[messages.length - 1];
+          const timestamp = latestMessage.timestamp;
+
+          try {
+            // Get current DM list
+            const getCommand = new GetItemCommand({
+              TableName: process.env.DYNAMODB_TABLE_DM_LISTS!,
+              Key: marshall({ userId })
+            });
+            const dmResponse = await dynamoClient.send(getCommand);
+            let dmUsers = dmResponse.Item ? unmarshall(dmResponse.Item).dmUsers || [] : [];
+
+            // Remove other user from current position if exists
+            const botId = Object.keys(BOT_PROFILES).find(id => channelId.includes(id)) as BotId | undefined;
+            dmUsers = dmUsers.filter((user: UserProfile) => 
+              botId ? user.userId !== botId : user.userId !== otherUserId
+            );
+
+            // Add other user at the beginning with new timestamp
+            if (botId) {
+              dmUsers.unshift({
+                ...BOT_PROFILES[botId],
+                lastMessageAt: timestamp
+              });
+            } else {
+              const otherUserProfile = await clerk.users.getUser(otherUserId);
+              dmUsers.unshift({
+                userId: otherUserId,
+                fullName: `${otherUserProfile.firstName} ${otherUserProfile.lastName}`.trim(),
+                username: otherUserProfile.username,
+                imageUrl: otherUserProfile.imageUrl,
+                status: 'online' as UserStatus,
+                lastMessageAt: timestamp
+              });
+            }
+
+            // Save updated list
+            const putCommand = new PutItemCommand({
+              TableName: process.env.DYNAMODB_TABLE_DM_LISTS!,
+              Item: marshall({
+                userId,
+                dmUsers,
+                updatedAt: new Date().toISOString()
+              })
+            });
+            await dynamoClient.send(putCommand);
+          } catch (dmError) {
+            // Log but don't fail the message fetch
+            console.error('Error updating DM list on message fetch:', {
+              error: dmError,
+              userId,
+              otherUserId,
+              channelId
+            });
+          }
+        }
+
         return NextResponse.json(messages);
       }
     }
@@ -325,6 +386,7 @@ export async function POST(request: NextRequest) {
       if (channelId.startsWith('dm-')) {
         const [user1Id, user2Id] = channelId.replace('dm-', '').split('-').sort();
         const recipientId = user1Id === userId ? user2Id : user1Id;
+        const timestamp = Date.now();
         
         try {
           // Update both users' DM lists in parallel
@@ -333,66 +395,107 @@ export async function POST(request: NextRequest) {
           // Always update sender's DM list
           console.log('Attempting to update sender DM list:', { userId, recipientId });
           updatePromises.push(
-            dmListService.updateLastMessageTime(userId, recipientId)
-              .then(() => console.log('Successfully updated sender DM list'))
-              .catch(error => {
-                console.error('Failed to update sender DM list:', {
-                  error,
-                  userId,
-                  recipientId
+            (async () => {
+              // Get sender's current DM list
+              const getCommand = new GetItemCommand({
+                TableName: process.env.DYNAMODB_TABLE_DM_LISTS!,
+                Key: marshall({ userId })
+              });
+              const response = await dynamoClient.send(getCommand);
+              let dmUsers = response.Item ? unmarshall(response.Item).dmUsers || [] : [];
+              
+              // Remove any existing entries for this user/bot
+              const botId = Object.keys(BOT_PROFILES).find(id => channelId.includes(id)) as BotId | undefined;
+              dmUsers = dmUsers.filter((user: UserProfile) => 
+                botId ? user.userId !== botId : user.userId !== recipientId
+              );
+              
+              // Add recipient at the beginning with new timestamp
+              if (botId) {
+                // If recipient is a bot, use bot profile
+                dmUsers.unshift({
+                  ...BOT_PROFILES[botId],
+                  lastMessageAt: timestamp
                 });
-                throw error;
-              })
+              } else {
+                // Otherwise fetch recipient profile from Clerk
+                const recipientProfile = await clerk.users.getUser(recipientId);
+                dmUsers.unshift({
+                  userId: recipientId,
+                  fullName: `${recipientProfile.firstName} ${recipientProfile.lastName}`.trim(),
+                  username: recipientProfile.username,
+                  imageUrl: recipientProfile.imageUrl,
+                  status: 'online' as UserStatus,
+                  lastMessageAt: timestamp
+                });
+              }
+
+              // Save updated list
+              const putCommand = new PutItemCommand({
+                TableName: process.env.DYNAMODB_TABLE_DM_LISTS!,
+                Item: marshall({
+                  userId,
+                  dmUsers,
+                  updatedAt: new Date().toISOString()
+                })
+              });
+              await dynamoClient.send(putCommand);
+              console.log('Successfully updated sender DM list');
+            })()
           );
           
-          // Update recipient's DM list if it's not the same user and not the bot
-          if (recipientId !== userId && recipientId !== 'chatgenius-bot') {
+          // Update recipient's DM list if it's not the same user and not a bot
+          const botId = Object.keys(BOT_PROFILES).find(id => channelId.includes(id)) as BotId | undefined;
+          if (recipientId !== userId && !botId) {
             console.log('Attempting to update recipient DM list:', { recipientId, userId });
             updatePromises.push(
-              dmListService.updateLastMessageTime(recipientId, userId)
-                .then(() => console.log('Successfully updated recipient DM list'))
-                .catch(error => {
-                  console.error('Failed to update recipient DM list:', {
-                    error,
-                    recipientId,
-                    userId
-                  });
-                  throw error;
-                })
+              (async () => {
+                // Get recipient's current DM list
+                const getCommand = new GetItemCommand({
+                  TableName: process.env.DYNAMODB_TABLE_DM_LISTS!,
+                  Key: marshall({ userId: recipientId })
+                });
+                const response = await dynamoClient.send(getCommand);
+                let dmUsers = response.Item ? unmarshall(response.Item).dmUsers || [] : [];
+                
+                // Remove sender from current position if exists
+                dmUsers = dmUsers.filter((user: UserProfile) => user.userId !== userId);
+                
+                // Add sender at the beginning with new timestamp
+                const senderProfile = await clerk.users.getUser(userId);
+                dmUsers.unshift({
+                  userId: userId,
+                  fullName: `${senderProfile.firstName} ${senderProfile.lastName}`.trim(),
+                  username: senderProfile.username,
+                  imageUrl: senderProfile.imageUrl,
+                  status: 'online',
+                  lastMessageAt: timestamp
+                });
+
+                // Save updated list
+                const putCommand = new PutItemCommand({
+                  TableName: process.env.DYNAMODB_TABLE_DM_LISTS!,
+                  Item: marshall({
+                    userId: recipientId,
+                    dmUsers,
+                    updatedAt: new Date().toISOString()
+                  })
+                });
+                await dynamoClient.send(putCommand);
+                console.log('Successfully updated recipient DM list');
+              })()
             );
           }
-          
-          await Promise.all(updatePromises).catch(error => {
-            // Log error but don't fail the message send
-            console.error('Error updating DM lists:', {
-              error,
-              userId,
-              recipientId,
-              channelId
-            });
-            throw error; // Re-throw to trigger retry
-          });
+
+          await Promise.all(updatePromises);
         } catch (dmError) {
-          // If DM list update fails, retry once after a short delay
-          console.log('Retrying DM list update after error...');
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-          try {
-            const updatePromises = [];
-            updatePromises.push(dmListService.updateLastMessageTime(userId, recipientId));
-            if (recipientId !== userId && recipientId !== 'chatgenius-bot') {
-              updatePromises.push(dmListService.updateLastMessageTime(recipientId, userId));
-            }
-            await Promise.all(updatePromises);
-          } catch (retryError) {
-            // Log but don't fail the message send
-            console.error('Error updating DM lists after retry:', {
-              error: retryError,
-              userId,
-              recipientId,
-              channelId
-            });
-          }
+          // Log but don't fail the message send
+          console.error('Error updating DM lists:', {
+            error: dmError,
+            userId,
+            recipientId,
+            channelId
+          });
         }
       }
       
