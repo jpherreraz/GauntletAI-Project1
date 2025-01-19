@@ -5,7 +5,7 @@ import { DynamoDBClient, PutItemCommand, QueryCommand, DeleteItemCommand, ScanCo
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
 import { v4 as uuidv4 } from 'uuid';
 import { dmListService } from '@/src/services/dmListService';
-import { UserStatus } from '@/src/services/userService';
+import { UserProfile, UserStatus } from '@/src/services/userService';
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
@@ -19,6 +19,47 @@ const dynamoClient = new DynamoDBClient({
 
 const MESSAGES_TABLE = process.env.DYNAMODB_TABLE_MESSAGES!;
 
+type BotId = 'chatgenius-bot' | 'notes-bot' | 'gollum-bot' | 'yoda-bot';
+
+const BOT_PROFILES: Record<BotId, Required<UserProfile>> = {
+  'chatgenius-bot': {
+    userId: 'chatgenius-bot',
+    fullName: 'ChatGenius Bot',
+    username: 'ChatGenius',
+    imageUrl: '/favicon.ico',
+    status: 'online' as UserStatus,
+    bio: 'Your AI assistant for all your questions and needs.',
+    lastMessageAt: Date.now()
+  },
+  'notes-bot': {
+    userId: 'notes-bot',
+    fullName: 'Notes Bot',
+    username: 'Notes',
+    imageUrl: '/notes-bot.svg',
+    status: 'online' as UserStatus,
+    bio: 'Keep track of your notes and important information.',
+    lastMessageAt: Date.now()
+  },
+  'gollum-bot': {
+    userId: 'gollum-bot',
+    fullName: 'Gollum Bot',
+    username: 'Gollum',
+    imageUrl: '/gollum.jpg',
+    status: 'online' as UserStatus,
+    bio: 'My precious! We helps you with riddles and secrets, yes precious!',
+    lastMessageAt: Date.now()
+  },
+  'yoda-bot': {
+    userId: 'yoda-bot',
+    fullName: 'Yoda Bot',
+    username: 'Yoda',
+    imageUrl: '/yoda.jpg',
+    status: 'online' as UserStatus,
+    bio: 'Help you I will. The Force, strong with this one, it is.',
+    lastMessageAt: Date.now()
+  }
+};
+
 // Helper function to remove undefined values from an object
 const removeUndefined = (obj: any): any => {
   return Object.fromEntries(
@@ -30,26 +71,6 @@ const removeUndefined = (obj: any): any => {
       ])
   );
 };
-
-const CHATGENIUS_BOT = {
-  userId: 'chatgenius-bot',
-  fullName: 'ChatGenius Bot',
-  username: 'ChatGenius',
-  imageUrl: '/favicon.ico',
-  status: 'online' as UserStatus
-};
-
-const getBotWelcomeMessage = (channelId: string) => ({
-  id: uuidv4(),
-  channelId,
-  userId: CHATGENIUS_BOT.userId,
-  text: "Welcome to ChatGenius! Feel free to ask me any questions.",
-  timestamp: Date.now(),
-  fullName: CHATGENIUS_BOT.fullName,
-  imageUrl: CHATGENIUS_BOT.imageUrl,
-  username: CHATGENIUS_BOT.username,
-  status: CHATGENIUS_BOT.status as UserStatus
-});
 
 async function validateAuth(request: NextRequest) {
   try {
@@ -119,7 +140,8 @@ export async function GET(request: NextRequest) {
     // Verify the user has access to this channel
     if (channelId.startsWith('dm-')) {
       const [user1Id, user2Id] = channelId.replace('dm-', '').split('-').sort();
-      if (userId !== user1Id && userId !== user2Id && !channelId.includes('chatgenius-bot')) {
+      const botId = Object.keys(BOT_PROFILES).find(id => channelId.includes(id)) as BotId | undefined;
+      if (userId !== user1Id && userId !== user2Id && !botId) {
         console.error('User not authorized for this DM channel:', { userId, channelId });
         return NextResponse.json(
           { error: "Failed to get messages", details: "Not authorized for this channel" },
@@ -128,45 +150,59 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // If this is a DM with the bot and it's the first fetch, add welcome message
-    if (channelId.startsWith('dm-') && channelId.includes('chatgenius-bot')) {
-      const command = new QueryCommand({
-        TableName: MESSAGES_TABLE,
-        KeyConditionExpression: "channelId = :channelId",
-        ExpressionAttributeValues: marshall({
-          ":channelId": channelId
-        }),
-      });
-
-      const response = await dynamoClient.send(command);
-      const messages = response.Items ? response.Items.map(item => unmarshall(item)) : [];
-
-      if (messages.length === 0) {
-        // Add welcome message
-        const welcomeMessage = getBotWelcomeMessage(channelId);
-        const putCommand = new PutItemCommand({
+    // If this is a DM with a bot and it's the first fetch, add welcome message
+    if (channelId.startsWith('dm-')) {
+      const botId = Object.keys(BOT_PROFILES).find(id => channelId.includes(id)) as BotId | undefined;
+      if (botId) {
+        const command = new QueryCommand({
           TableName: MESSAGES_TABLE,
-          Item: marshall(welcomeMessage),
+          KeyConditionExpression: "channelId = :channelId",
+          ExpressionAttributeValues: marshall({
+            ":channelId": channelId
+          }),
         });
-        await dynamoClient.send(putCommand);
-        messages.push(welcomeMessage);
 
-        // Update bot's lastMessageAt in the user's DM list
-        const userId = channelId.replace('dm-', '').split('-').find(id => id !== 'chatgenius-bot');
-        if (userId) {
-          const userDmUsers = await dmListService.getDMList(userId);
-          const timestamp = Date.now();
-          const updatedDmUsers = userDmUsers.map(user => {
-            if (user.userId === 'chatgenius-bot') {
-              return { ...user, lastMessageAt: timestamp };
-            }
-            return user;
+        const response = await dynamoClient.send(command);
+        const messages = response.Items ? response.Items.map(item => unmarshall(item)) : [];
+
+        if (messages.length === 0) {
+          // Add welcome message using the correct bot profile
+          const welcomeMessage = {
+            id: uuidv4(),
+            channelId,
+            userId: botId,
+            text: BOT_PROFILES[botId].bio,
+            timestamp: Date.now(),
+            fullName: BOT_PROFILES[botId].fullName,
+            imageUrl: BOT_PROFILES[botId].imageUrl,
+            username: BOT_PROFILES[botId].username,
+            status: BOT_PROFILES[botId].status
+          };
+
+          const putCommand = new PutItemCommand({
+            TableName: MESSAGES_TABLE,
+            Item: marshall(welcomeMessage),
           });
-          await dmListService.saveDMList(userId, updatedDmUsers);
-        }
-      }
+          await dynamoClient.send(putCommand);
+          messages.push(welcomeMessage);
 
-      return NextResponse.json(messages);
+          // Update bot's lastMessageAt in the user's DM list
+          const dmUserId = channelId.replace('dm-', '').split('-').find(id => id !== botId);
+          if (dmUserId) {
+            const userDmUsers = await dmListService.getDMList(dmUserId);
+            const timestamp = Date.now();
+            const updatedDmUsers = userDmUsers.map(user => {
+              if (user.userId === botId) {
+                return { ...user, lastMessageAt: timestamp };
+              }
+              return user;
+            });
+            await dmListService.saveDMList(dmUserId, updatedDmUsers);
+          }
+        }
+
+        return NextResponse.json(messages);
+      }
     }
 
     // Regular message fetch
@@ -189,21 +225,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(messages);
   } catch (error) {
     console.error('Error in GET /api/messages:', error);
-    console.error('Error details:', {
-      name: error instanceof Error ? error.name : 'Unknown',
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      table: MESSAGES_TABLE,
-      credentials: {
-        hasAccessKey: !!process.env.AWS_ACCESS_KEY_ID,
-        hasSecretKey: !!process.env.AWS_SECRET_ACCESS_KEY
-      }
-    });
     return NextResponse.json(
-      { 
-        error: 'Failed to get messages', 
-        details: error instanceof Error ? error.message : String(error)
-      },
+      { error: "Failed to get messages", details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
@@ -261,14 +284,9 @@ export async function POST(request: NextRequest) {
     // Verify the user has access to this channel
     if (channelId.startsWith('dm-')) {
       const [user1Id, user2Id] = channelId.replace('dm-', '').split('-').sort();
-      if (userId !== user1Id && userId !== user2Id && !channelId.includes('chatgenius-bot')) {
-        console.error('User not authorized for this DM channel:', { 
-          userId, 
-          channelId,
-          user1Id,
-          user2Id,
-          isBot: channelId.includes('chatgenius-bot')
-        });
+      const botId = Object.keys(BOT_PROFILES).find(id => channelId.includes(id)) as BotId | undefined;
+      if (userId !== user1Id && userId !== user2Id && !botId) {
+        console.error('User not authorized for this DM channel:', { userId, channelId });
         return NextResponse.json(
           { error: "Failed to send message", details: "Not authorized for this channel" },
           { status: 403 }

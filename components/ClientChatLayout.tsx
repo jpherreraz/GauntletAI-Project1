@@ -26,6 +26,7 @@ export function ClientChatLayout({
   const [currentChannel, setCurrentChannel] = useState('general')
   const [viewMode, setViewMode] = useState<ViewMode>('channels')
   const [exploreView, setExploreView] = useState<ExploreView>('none')
+  const [lastExploreView, setLastExploreView] = useState<'servers' | 'bots'>('servers')
   const [dmUsers, setDmUsers] = useState<UserProfile[]>([])
   const [selectedDMUser, setSelectedDMUser] = useState<UserProfile | null>(null)
   const [selectedDMUserId, setSelectedDMUserId] = useState<string | null>(null)
@@ -39,6 +40,13 @@ export function ClientChatLayout({
       const userId = pathname.split('/').pop();
       if (userId && userId !== 'me') {
         setLastViewedDMUserId(userId);
+      } else if (userId === 'me' && dmUsers.length > 0) {
+        // When landing on /channels/me, redirect to most recent DM
+        const mostRecentDM = dmUsers[0];
+        router.push(`/channels/me/${mostRecentDM.userId}`);
+        setSelectedDMUserId(mostRecentDM.userId);
+        setSelectedDMUser(mostRecentDM);
+        setLastViewedDMUserId(mostRecentDM.userId);
       }
     } else if (pathname.startsWith('/channels/global/')) {
       setViewMode('channels');
@@ -48,8 +56,11 @@ export function ClientChatLayout({
       setViewMode('explore');
       const view = pathname.split('/').pop() as ExploreView;
       setExploreView(view || 'servers');
+      if (view === 'servers' || view === 'bots') {
+        setLastExploreView(view);
+      }
     }
-  }, [pathname]);
+  }, [pathname, dmUsers, router]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -101,8 +112,8 @@ export function ClientChatLayout({
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
     if (mode === 'explore') {
-      setExploreView('servers');
-      router.push('/explore/servers');
+      setExploreView(lastExploreView);
+      router.push(`/explore/${lastExploreView}`);
     } else if (mode === 'dms') {
       setExploreView('none');
       // First try to open the last viewed DM
@@ -184,6 +195,26 @@ export function ClientChatLayout({
     return children;
   };
 
+  const handleDMListChange = (updatedUsers: UserProfile[]) => {
+    setDmUsers(updatedUsers);
+    
+    // If we're in DM view and either on /channels/me or viewing a DM that was just deleted
+    if (viewMode === 'dms' && (
+      pathname === '/channels/me' || 
+      (selectedDMUserId && !updatedUsers.some(u => u.userId === selectedDMUserId))
+    )) {
+      if (updatedUsers.length > 0) {
+        const mostRecentDM = updatedUsers[0];
+        router.push(`/channels/me/${mostRecentDM.userId}`);
+        setSelectedDMUserId(mostRecentDM.userId);
+        setSelectedDMUser(mostRecentDM);
+        setLastViewedDMUserId(mostRecentDM.userId);
+      } else {
+        router.push('/channels/me');
+      }
+    }
+  };
+
   if (!user) return null;
 
   return (
@@ -203,7 +234,7 @@ export function ClientChatLayout({
         dmUsers={dmUsers}
         onStartDM={handleStartDM}
         selectedDMUserId={selectedDMUserId || ''}
-        onDMListChange={setDmUsers}
+        onDMListChange={handleDMListChange}
       />
       <main className="flex-1 relative overflow-hidden">
         <ThreadProvider>
