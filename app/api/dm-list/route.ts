@@ -2,7 +2,7 @@ import { NextResponse, NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { DynamoDBClient, GetItemCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
-import { UserProfile } from "@/src/services/userService";
+import { UserProfile, UserStatus } from "@/src/services/userService";
 
 const dynamoDb = new DynamoDBClient({
   region: "us-east-2",
@@ -14,14 +14,43 @@ const dynamoDb = new DynamoDBClient({
 
 const TABLE_NAME = process.env.DYNAMODB_TABLE_DM_LISTS || "user-dm-lists";
 
-const CHATGENIUS_BOT: Required<UserProfile> = {
-  userId: 'chatgenius-bot',
-  fullName: 'ChatGenius Bot',
-  username: 'ChatGenius',
-  imageUrl: '/favicon.ico',
-  status: 'online',
-  bio: 'Your AI assistant for all your questions and needs.',
-  lastMessageAt: Date.now()
+const BOT_PROFILES: Record<string, Required<UserProfile>> = {
+  'chatgenius-bot': {
+    userId: 'chatgenius-bot',
+    fullName: 'ChatGenius Bot',
+    username: 'ChatGenius',
+    imageUrl: '/favicon.ico',
+    status: 'online' as UserStatus,
+    bio: 'Your AI assistant for all your questions and needs.',
+    lastMessageAt: Date.now()
+  },
+  'notes-bot': {
+    userId: 'notes-bot',
+    fullName: 'Notes Bot',
+    username: 'Notes',
+    imageUrl: '/notes-bot.svg',
+    status: 'online' as UserStatus,
+    bio: 'Keep track of your notes and important information.',
+    lastMessageAt: Date.now()
+  },
+  'gollum-bot': {
+    userId: 'gollum-bot',
+    fullName: 'Gollum Bot',
+    username: 'Gollum',
+    imageUrl: '/gollum.jpg',
+    status: 'online' as UserStatus,
+    bio: 'My precious! We helps you with riddles and secrets, yes precious!',
+    lastMessageAt: Date.now()
+  },
+  'yoda-bot': {
+    userId: 'yoda-bot',
+    fullName: 'Yoda Bot',
+    username: 'Yoda',
+    imageUrl: '/yoda.jpg',
+    status: 'online' as UserStatus,
+    bio: 'Help you I will. The Force, strong with this one, it is.',
+    lastMessageAt: Date.now()
+  }
 };
 
 export async function GET(request: NextRequest) {
@@ -42,6 +71,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Missing userId" }, { status: 400 });
     }
 
+    // Don't fetch DM list for bots
+    if (Object.keys(BOT_PROFILES).includes(requestedUserId)) {
+      return NextResponse.json([]);
+    }
+
     // Get current DM list from DynamoDB
     const getCommand = new GetItemCommand({
       TableName: TABLE_NAME,
@@ -57,10 +91,10 @@ export async function GET(request: NextRequest) {
       dmUsers = currentData.dmUsers || [];
     }
 
-    // Ensure the bot is always present
-    if (!dmUsers.some(user => user.userId === CHATGENIUS_BOT.userId)) {
+    // Ensure the ChatGenius bot is always present
+    if (!dmUsers.some(user => user.userId === BOT_PROFILES['chatgenius-bot'].userId)) {
       dmUsers.unshift({
-        ...CHATGENIUS_BOT,
+        ...BOT_PROFILES['chatgenius-bot'],
         lastMessageAt: Date.now()
       });
     }
@@ -70,7 +104,7 @@ export async function GET(request: NextRequest) {
 
     console.log("DM list endpoint - Success:", {
       userCount: dmUsers.length,
-      hasBot: dmUsers.some(u => u.userId === CHATGENIUS_BOT.userId),
+      hasBot: dmUsers.some(u => u.userId === BOT_PROFILES['chatgenius-bot'].userId),
       users: dmUsers.map(u => ({
         id: u.userId,
         time: u.lastMessageAt,

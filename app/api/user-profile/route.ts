@@ -14,14 +14,43 @@ const dynamoClient = new DynamoDBClient({
 
 const TABLE_NAME = process.env.DYNAMODB_TABLE_USER_PROFILES || "user-profiles";
 
-const BOT_PROFILE = {
-  userId: 'chatgenius-bot',
-  fullName: 'ChatGenius Bot',
-  username: 'ChatGenius',
-  imageUrl: '/bot-avatar.png',
-  status: 'online',
-  bio: 'I am the ChatGenius AI assistant',
-  lastMessageAt: Date.now()
+const BOT_PROFILES = {
+  'chatgenius-bot': {
+    userId: 'chatgenius-bot',
+    fullName: 'ChatGenius Bot',
+    username: 'ChatGenius',
+    imageUrl: '/favicon.ico',
+    status: 'online',
+    bio: 'I am the ChatGenius AI assistant',
+    lastMessageAt: Date.now()
+  },
+  'notes-bot': {
+    userId: 'notes-bot',
+    fullName: 'Notes Bot',
+    username: 'Notes',
+    imageUrl: '/notes-bot.svg',
+    status: 'online',
+    bio: 'Keep track of your notes and important information.',
+    lastMessageAt: Date.now()
+  },
+  'gollum-bot': {
+    userId: 'gollum-bot',
+    fullName: 'Gollum Bot',
+    username: 'Gollum',
+    imageUrl: '/gollum.jpg',
+    status: 'online',
+    bio: 'My precious! We helps you with riddles and secrets, yes precious!',
+    lastMessageAt: Date.now()
+  },
+  'yoda-bot': {
+    userId: 'yoda-bot',
+    fullName: 'Yoda Bot',
+    username: 'Yoda',
+    imageUrl: '/yoda.jpg',
+    status: 'online',
+    bio: 'Help you I will. The Force, strong with this one, it is.',
+    lastMessageAt: Date.now()
+  }
 };
 
 export async function GET(request: NextRequest) {
@@ -42,10 +71,10 @@ export async function GET(request: NextRequest) {
 
     console.log('GET /api/user-profile: Fetching data for userId:', requestedUserId);
 
-    // Special handling for bot profile
-    if (requestedUserId === 'chatgenius-bot') {
+    // Special handling for bot profiles
+    if (BOT_PROFILES[requestedUserId as keyof typeof BOT_PROFILES]) {
       console.log('GET /api/user-profile: Returning bot profile');
-      return NextResponse.json(BOT_PROFILE);
+      return NextResponse.json(BOT_PROFILES[requestedUserId as keyof typeof BOT_PROFILES]);
     }
 
     // Get user data from Clerk first

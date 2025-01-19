@@ -108,11 +108,6 @@ export function Sidebar({
       const updatedUsers = dmUsers.filter(dmUser => dmUser.userId !== userId)
       onDMListChange?.(updatedUsers)
 
-      // Redirect if we're in the deleted DM's channel
-      if (pathname?.includes(`/channels/me/${userId}`)) {
-        router.push('/channels/me')
-      }
-
       // Make the API call in the background
       const response = await fetch(`/api/dm-list/remove?userId=${user?.id}&targetId=${userId}`, {
         method: 'DELETE'

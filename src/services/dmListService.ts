@@ -5,14 +5,43 @@ export interface DMList {
   dmUsers: UserProfile[];
 }
 
-const CHATGENIUS_BOT: Required<UserProfile> = {
-  userId: 'chatgenius-bot',
-  fullName: 'ChatGenius Bot',
-  username: 'ChatGenius',
-  imageUrl: '/favicon.ico',
-  status: 'online',
-  bio: 'Your AI assistant for all your questions and needs.',
-  lastMessageAt: Date.now()
+const BOT_PROFILES: Record<string, Required<UserProfile>> = {
+  'chatgenius-bot': {
+    userId: 'chatgenius-bot',
+    fullName: 'ChatGenius Bot',
+    username: 'ChatGenius',
+    imageUrl: '/favicon.ico',
+    status: 'online' as UserStatus,
+    bio: 'Your AI assistant for all your questions and needs.',
+    lastMessageAt: Date.now()
+  },
+  'notes-bot': {
+    userId: 'notes-bot',
+    fullName: 'Notes Bot',
+    username: 'Notes',
+    imageUrl: '/notes-bot.svg',
+    status: 'online' as UserStatus,
+    bio: 'Keep track of your notes and important information.',
+    lastMessageAt: Date.now()
+  },
+  'gollum-bot': {
+    userId: 'gollum-bot',
+    fullName: 'Gollum Bot',
+    username: 'Gollum',
+    imageUrl: '/gollum.jpg',
+    status: 'online' as UserStatus,
+    bio: 'My precious! We helps you with riddles and secrets, yes precious!',
+    lastMessageAt: Date.now()
+  },
+  'yoda-bot': {
+    userId: 'yoda-bot',
+    fullName: 'Yoda Bot',
+    username: 'Yoda',
+    imageUrl: '/yoda.jpg',
+    status: 'online' as UserStatus,
+    bio: 'Help you I will. The Force, strong with this one, it is.',
+    lastMessageAt: Date.now()
+  }
 };
 
 async function fetchWithCredentials(url: string, options: RequestInit = {}): Promise<Response> {
@@ -42,7 +71,7 @@ export const dmListService = {
   async saveDMList(userId: string, dmUsers: UserProfile[]): Promise<boolean> {
     try {
       // Don't save anything if this is the bot's DM list
-      if (userId === CHATGENIUS_BOT.userId) {
+      if (userId === BOT_PROFILES['chatgenius-bot'].userId) {
         return true;
       }
 
@@ -58,9 +87,9 @@ export const dmListService = {
       });
 
       // Ensure the bot is always present
-      if (!updatedDmUsers.some(user => user.userId === CHATGENIUS_BOT.userId)) {
+      if (!updatedDmUsers.some(user => user.userId === BOT_PROFILES['chatgenius-bot'].userId)) {
         const botUser = {
-          ...CHATGENIUS_BOT,
+          ...BOT_PROFILES['chatgenius-bot'],
           lastMessageAt: Date.now()
         };
         // Insert bot based on its lastMessageAt timestamp
@@ -95,13 +124,14 @@ export const dmListService = {
 
   async getDMList(userId: string): Promise<UserProfile[]> {
     try {
-      if (userId === CHATGENIUS_BOT.userId) return [];
+      // Don't fetch DM list for bots
+      if (Object.keys(BOT_PROFILES).includes(userId)) return [];
 
       const response = await fetchWithCredentials(`/api/dm-list?userId=${userId}`);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        if (response.status === 401) return [CHATGENIUS_BOT];
+        if (response.status === 401) return [BOT_PROFILES['chatgenius-bot']];
         throw new Error('Failed to fetch DM list');
       }
 
@@ -118,7 +148,7 @@ export const dmListService = {
       return sortedData || [];
     } catch (error) {
       console.error('Error fetching DM list:', error);
-      return [CHATGENIUS_BOT];
+      return [BOT_PROFILES['chatgenius-bot']];
     }
   },
 
@@ -137,11 +167,11 @@ export const dmListService = {
       const filteredUsers = currentDmUsers.filter(user => user.userId !== dmUserId);
 
       let updatedUser;
-      if (dmUserId === CHATGENIUS_BOT.userId) {
+      if (dmUserId === BOT_PROFILES['chatgenius-bot'].userId) {
         // Special handling for bot - preserve existing data if available
-        const existingBot = currentDmUsers.find(u => u.userId === CHATGENIUS_BOT.userId);
+        const existingBot = currentDmUsers.find(u => u.userId === BOT_PROFILES['chatgenius-bot'].userId);
         updatedUser = {
-          ...(existingBot || CHATGENIUS_BOT),
+          ...(existingBot || BOT_PROFILES['chatgenius-bot']),
           lastMessageAt: timestamp
         };
       } else if (userId === dmUserId) {
@@ -261,22 +291,22 @@ export const dmListService = {
   async addChatGeniusBot(userId: string): Promise<boolean> {
     try {
       // Don't add bot to its own list
-      if (userId === CHATGENIUS_BOT.userId) {
+      if (userId === BOT_PROFILES['chatgenius-bot'].userId) {
         return true;
       }
 
       const currentDmUsers = await this.getDMList(userId);
       
       // If bot is already present with a more recent timestamp, don't update
-      const existingBot = currentDmUsers.find(user => user.userId === CHATGENIUS_BOT.userId);
-      if (existingBot?.lastMessageAt && existingBot.lastMessageAt > CHATGENIUS_BOT.lastMessageAt) {
+      const existingBot = currentDmUsers.find(user => user.userId === BOT_PROFILES['chatgenius-bot'].userId);
+      if (existingBot?.lastMessageAt && existingBot.lastMessageAt > BOT_PROFILES['chatgenius-bot'].lastMessageAt) {
         return true;
       }
 
       // Add or update bot
-      const updatedDmUsers = currentDmUsers.filter(user => user.userId !== CHATGENIUS_BOT.userId);
+      const updatedDmUsers = currentDmUsers.filter(user => user.userId !== BOT_PROFILES['chatgenius-bot'].userId);
       updatedDmUsers.push({
-        ...CHATGENIUS_BOT,
+        ...BOT_PROFILES['chatgenius-bot'],
         lastMessageAt: Date.now() // Use current timestamp when adding bot
       });
 
