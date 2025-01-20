@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { dmListService } from '@/src/services/dmListService';
 import { UserProfile, UserStatus } from '@/src/services/userService';
 import { aiService } from '@/src/services/aiService';
+import { NotesBotStorage } from '@/src/utils/notes-bot-storage';
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
@@ -387,28 +388,56 @@ export async function POST(request: NextRequest) {
       if (channelId.startsWith('dm-')) {
         const botId = Object.keys(BOT_PROFILES).find(id => channelId.includes(id)) as BotId | undefined;
         if (botId) {
-          // Get bot response
-          const botResponse = await aiService.generateBotResponse(botId, text);
+          // Initialize storage for Notes Bot
+          const storage = NotesBotStorage.getInstance();
           
-          // Create bot message
-          const botMessage = {
-            id: uuidv4(),
-            channelId,
-            userId: botId,
-            text: botResponse,
-            timestamp: Date.now(),
-            fullName: BOT_PROFILES[botId].fullName,
-            imageUrl: BOT_PROFILES[botId].imageUrl,
-            reactions: {}
-          };
+          // Save user message to storage if it's Notes Bot
+          if (botId === 'notes-bot') {
+            await storage.saveMessage(channelId, {
+              id: message.id,
+              text: message.text,
+              timestamp: message.timestamp,
+              userId: message.userId,
+              fullName: message.fullName
+            });
+          }
 
-          // Save bot message
-          const botCommand = new PutItemCommand({
-            TableName: MESSAGES_TABLE,
-            Item: marshall(botMessage, { removeUndefinedValues: true })
-          });
+          // Get bot response with channelId for context
+          const botResponse = await aiService.generateBotResponse(botId, text, channelId);
+          
+          // Only save bot message if there's a non-empty response
+          if (botResponse.trim()) {
+            // Create bot message
+            const botMessage = {
+              id: uuidv4(),
+              channelId,
+              userId: botId,
+              text: botResponse,
+              timestamp: Date.now(),
+              fullName: BOT_PROFILES[botId].fullName,
+              imageUrl: BOT_PROFILES[botId].imageUrl,
+              reactions: {}
+            };
 
-          await dynamoClient.send(botCommand);
+            // Save bot message to storage if it's Notes Bot
+            if (botId === 'notes-bot') {
+              await storage.saveMessage(channelId, {
+                id: botMessage.id,
+                text: botMessage.text,
+                timestamp: botMessage.timestamp,
+                userId: botMessage.userId,
+                fullName: botMessage.fullName
+              });
+            }
+
+            // Save bot message to DynamoDB
+            const botCommand = new PutItemCommand({
+              TableName: MESSAGES_TABLE,
+              Item: marshall(botMessage, { removeUndefinedValues: true })
+            });
+
+            await dynamoClient.send(botCommand);
+          }
         }
       }
 
