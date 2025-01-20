@@ -1,6 +1,7 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { BOT_PROFILES } from './dmListService';
+import { NotesBotStorage } from '../utils/notes-bot-storage';
 
 // Initialize OpenAI chat model
 const chatModel = new ChatOpenAI({
@@ -18,20 +19,22 @@ const BOT_PERSONALITIES: Record<string, string> = {
 };
 
 export const aiService = {
-  async generateBotResponse(botId: string, userMessage: string, messageHistory: any[] = []): Promise<string> {
+  async generateBotResponse(botId: string, userMessage: string, channelId?: string): Promise<string> {
     try {
-      // Get bot personality
+      // For Notes Bot, use RAG chain
+      if (botId === 'notes-bot' && channelId) {
+        const storage = NotesBotStorage.getInstance();
+        return await storage.generateResponse(channelId, userMessage);
+      }
+
+      // For other bots, use regular chat
       const personality = BOT_PERSONALITIES[botId] || BOT_PERSONALITIES['chatgenius-bot'];
-      
-      // Create messages array with system message and user input
       const messages = [
         new SystemMessage(personality),
         new HumanMessage(userMessage)
       ];
 
-      // Get response from OpenAI
       const response = await chatModel.invoke(messages);
-      
       return String(response.content);
     } catch (error) {
       console.error('Error generating bot response:', error);
