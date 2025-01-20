@@ -5,7 +5,7 @@ export interface DMList {
   dmUsers: UserProfile[];
 }
 
-const BOT_PROFILES: Record<string, Required<UserProfile>> = {
+export const BOT_PROFILES: Record<string, Required<UserProfile>> = {
   'chatgenius-bot': {
     userId: 'chatgenius-bot',
     fullName: 'ChatGenius Bot',

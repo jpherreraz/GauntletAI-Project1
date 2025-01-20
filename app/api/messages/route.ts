@@ -6,6 +6,7 @@ import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
 import { v4 as uuidv4 } from 'uuid';
 import { dmListService } from '@/src/services/dmListService';
 import { UserProfile, UserStatus } from '@/src/services/userService';
+import { aiService } from '@/src/services/aiService';
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
@@ -381,6 +382,35 @@ export async function POST(request: NextRequest) {
 
       await dynamoClient.send(command);
       console.log('Message saved successfully');
+
+      // If this is a DM with a bot, generate and save bot response
+      if (channelId.startsWith('dm-')) {
+        const botId = Object.keys(BOT_PROFILES).find(id => channelId.includes(id)) as BotId | undefined;
+        if (botId) {
+          // Get bot response
+          const botResponse = await aiService.generateBotResponse(botId, text);
+          
+          // Create bot message
+          const botMessage = {
+            id: uuidv4(),
+            channelId,
+            userId: botId,
+            text: botResponse,
+            timestamp: Date.now(),
+            fullName: BOT_PROFILES[botId].fullName,
+            imageUrl: BOT_PROFILES[botId].imageUrl,
+            reactions: {}
+          };
+
+          // Save bot message
+          const botCommand = new PutItemCommand({
+            TableName: MESSAGES_TABLE,
+            Item: marshall(botMessage, { removeUndefinedValues: true })
+          });
+
+          await dynamoClient.send(botCommand);
+        }
+      }
 
       // If this is a DM, update lastMessageAt for both users
       if (channelId.startsWith('dm-')) {
