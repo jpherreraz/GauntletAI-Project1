@@ -1,13 +1,12 @@
 import { Pinecone } from '@pinecone-database/pinecone';
-import { Document } from 'langchain/document';
-import { OpenAIEmbeddings } from 'langchain/embeddings/openai';
+import { Document } from '@langchain/core/documents';
+import { OpenAIEmbeddings } from '@langchain/openai';
 import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
-import { PineconeStore } from 'langchain/vectorstores/pinecone';
+import { PineconeStore } from '@langchain/pinecone';
 
 // Initialize Pinecone client
 const pinecone = new Pinecone({
-  apiKey: process.env.PINECONE_API_KEY!,
-  environment: process.env.PINECONE_ENVIRONMENT!
+  apiKey: process.env.PINECONE_API_KEY!
 });
 
 const PINECONE_INDEX_NAME = 'notes-memory';
